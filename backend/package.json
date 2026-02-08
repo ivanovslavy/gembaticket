@@ -1,0 +1,14 @@
+{
+  "name": "gembaticket-backend",
+  "version": "2.0.0",
+  "description": "GembaTicket API server",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest",
+    "migrate": "node database/migrations/run.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

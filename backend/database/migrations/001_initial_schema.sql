@@ -1,0 +1,2 @@
+-- GembaTicket v2 — Initial database schema
+-- See docs/nft-ticket-platform-v2-plan-en.md Section 4.1
