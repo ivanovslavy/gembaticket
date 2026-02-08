@@ -1,0 +1,411 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./interfaces/IClaimContract.sol";
+
+/// @title PlatformRegistry — Event factory, treasury, and admin in one contract
+/// @notice Replaces Diamond Proxy. Deploys events via EIP-1167 minimal clones.
+///         Template upgrade: deploy new template → setTemplate() → new events use it.
+///         Old events remain on old template (immutable, safe).
+/// @dev Only 2 contracts are proxied (event clones). This and ClaimContract are regular.
+contract PlatformRegistry is ReentrancyGuard {
+
+    // =========================================================================
+    // ERRORS
+    // =========================================================================
+
+    error NotAdmin();
+    error NotMultisig();
+    error InvalidTemplate();
+    error InvalidAddress();
+    error InsufficientFee();
+    error WithdrawFailed();
+    error FundingFailed();
+    error EventCreationFailed();
+    error InvalidEventType();
+    error Paused();
+
+    // =========================================================================
+    // EVENTS
+    // =========================================================================
+
+    event EventCreated(
+        address indexed eventAddress,
+        address indexed organizer,
+        uint256 eventType,
+        string eventName
+    );
+    event EventCreatedWithFiat(
+        address indexed eventAddress,
+        address indexed organizer,
+        bytes32 paymentHash
+    );
+    event TemplateUpdated(uint256 indexed eventType, address oldTemplate, address newTemplate);
+    event CreateFeeUpdated(uint256 newFee);
+    event PlatformFeeUpdated(uint256 newFeeBps);
+    event PlatformSignerUpdated(address newSigner);
+    event ClaimContractUpdated(address newClaimContract);
+    event FundsReceived(address indexed from, uint256 amount);
+    event FundsWithdrawn(address indexed to, uint256 amount);
+    event SignerFunded(uint256 amount);
+    event PlatformPaused(bool paused);
+
+    // =========================================================================
+    // STATE
+    // =========================================================================
+
+    // Admin (deployer, can update settings)
+    address public admin;
+
+    // Multisig for treasury withdrawals (can be same as admin initially)
+    address public multisig;
+
+    // Platform signer wallet (pays gas for fiat mints, activations)
+    address public platformSigner;
+
+    // ClaimContract reference
+    address public claimContract;
+
+    // Template contracts for cloning
+    address public erc721Template;
+    address public erc1155Template;
+
+    // Fees
+    uint256 public createEventFee;     // Fee to create event (in native token)
+    uint256 public platformFeeBps;     // Platform fee on ticket sales (basis points)
+
+    // State
+    bool public isPaused;
+
+    // Registry of all deployed events
+    address[] public allEvents;
+    mapping(address => bool) public isEvent;
+    mapping(address => address) public eventOrganizer;
+
+    // =========================================================================
+    // CONSTRUCTOR
+    // =========================================================================
+
+    /// @param _admin Admin address (can update settings)
+    /// @param _multisig Multisig address (can withdraw funds)
+    /// @param _platformSigner Platform signer address (pays gas)
+    /// @param _claimContract ClaimContract address
+    /// @param _erc721Template EventContract721 template address
+    /// @param _erc1155Template EventContract1155 template address
+    /// @param _createEventFee Fee for creating events (wei)
+    /// @param _platformFeeBps Platform fee basis points (500 = 5%)
+    constructor(
+        address _admin,
+        address _multisig,
+        address _platformSigner,
+        address _claimContract,
+        address _erc721Template,
+        address _erc1155Template,
+        uint256 _createEventFee,
+        uint256 _platformFeeBps
+    ) {
+        admin = _admin;
+        multisig = _multisig;
+        platformSigner = _platformSigner;
+        claimContract = _claimContract;
+        erc721Template = _erc721Template;
+        erc1155Template = _erc1155Template;
+        createEventFee = _createEventFee;
+        platformFeeBps = _platformFeeBps;
+    }
+
+    // =========================================================================
+    // EVENT CREATION — Crypto payment
+    // =========================================================================
+
+    /// @notice Create a new event. Clones the appropriate template.
+    ///         Organizer pays creation fee in native token.
+    /// @param _eventType 0 = ERC721, 1 = ERC1155
+    /// @param _eventName Event name
+    /// @param _baseURI IPFS metadata base URI
+    /// @param _maxSupply Maximum total tickets
+    /// @param _priceInNative Ticket price (for ERC721; ignored for ERC1155)
+    function createEvent(
+        uint256 _eventType,
+        string calldata _eventName,
+        string calldata _baseURI,
+        uint256 _maxSupply,
+        uint256 _priceInNative
+    ) external payable nonReentrant returns (address eventAddress) {
+        if (isPaused) revert Paused();
+        if (msg.value < createEventFee) revert InsufficientFee();
+
+        eventAddress = _deployEvent(
+            _eventType,
+            _eventName,
+            _baseURI,
+            _maxSupply,
+            _priceInNative,
+            msg.sender
+        );
+
+        emit EventCreated(eventAddress, msg.sender, _eventType, _eventName);
+    }
+
+    // =========================================================================
+    // EVENT CREATION — Fiat payment (platform signer calls after GembaPay)
+    // =========================================================================
+
+    /// @notice Create event after fiat payment confirmed by GembaPay webhook.
+    ///         Gas paid by platform signer.
+    /// @param _eventType 0 = ERC721, 1 = ERC1155
+    /// @param _eventName Event name
+    /// @param _baseURI IPFS metadata base URI
+    /// @param _maxSupply Maximum total tickets
+    /// @param _priceInNative Ticket price
+    /// @param _organizer Organizer address
+    /// @param _paymentHash GembaPay payment ID hash
+    function createEventWithFiatProof(
+        uint256 _eventType,
+        string calldata _eventName,
+        string calldata _baseURI,
+        uint256 _maxSupply,
+        uint256 _priceInNative,
+        address _organizer,
+        bytes32 _paymentHash
+    ) external onlySigner nonReentrant returns (address eventAddress) {
+        if (isPaused) revert Paused();
+
+        eventAddress = _deployEvent(
+            _eventType,
+            _eventName,
+            _baseURI,
+            _maxSupply,
+            _priceInNative,
+            _organizer
+        );
+
+        emit EventCreatedWithFiat(eventAddress, _organizer, _paymentHash);
+    }
+
+    // =========================================================================
+    // INTERNAL DEPLOY
+    // =========================================================================
+
+    function _deployEvent(
+        uint256 _eventType,
+        string calldata _eventName,
+        string calldata _baseURI,
+        uint256 _maxSupply,
+        uint256 _priceInNative,
+        address _organizer
+    ) internal returns (address eventAddress) {
+        // Deterministic salt for predictable addresses
+        bytes32 salt = keccak256(abi.encodePacked(
+            _organizer,
+            allEvents.length,
+            block.timestamp
+        ));
+
+        // Clone the appropriate template
+        if (_eventType == 0) {
+            if (erc721Template == address(0)) revert InvalidTemplate();
+            eventAddress = Clones.cloneDeterministic(erc721Template, salt);
+
+            // Initialize ERC721 event
+            (bool success,) = eventAddress.call(
+                abi.encodeWithSignature(
+                    "initialize(string,string,uint256,uint256,uint256,address,address,address,address)",
+                    _eventName,
+                    _baseURI,
+                    _maxSupply,
+                    _priceInNative,
+                    platformFeeBps,
+                    _organizer,
+                    platformSigner,
+                    address(this),  // treasury = this contract
+                    claimContract
+                )
+            );
+            if (!success) revert EventCreationFailed();
+
+        } else if (_eventType == 1) {
+            if (erc1155Template == address(0)) revert InvalidTemplate();
+            eventAddress = Clones.cloneDeterministic(erc1155Template, salt);
+
+            // Initialize ERC1155 event
+            (bool success,) = eventAddress.call(
+                abi.encodeWithSignature(
+                    "initialize(string,string,uint256,uint256,address,address,address,address)",
+                    _eventName,
+                    _baseURI,
+                    _maxSupply,
+                    platformFeeBps,
+                    _organizer,
+                    platformSigner,
+                    address(this),
+                    claimContract
+                )
+            );
+            if (!success) revert EventCreationFailed();
+
+        } else {
+            revert InvalidEventType();
+        }
+
+        // Register in ClaimContract
+        IClaimContract(claimContract).registerEvent(eventAddress);
+
+        // Track
+        allEvents.push(eventAddress);
+        isEvent[eventAddress] = true;
+        eventOrganizer[eventAddress] = _organizer;
+    }
+
+    // =========================================================================
+    // TREASURY — Receives platform fees from event contracts
+    // =========================================================================
+
+    receive() external payable {
+        emit FundsReceived(msg.sender, msg.value);
+    }
+
+    /// @notice Withdraw funds from treasury. Multisig only.
+    /// @param _to Recipient address
+    /// @param _amount Amount in wei
+    function withdraw(address _to, uint256 _amount) external onlyMultisig nonReentrant {
+        if (_to == address(0)) revert InvalidAddress();
+
+        (bool sent,) = _to.call{value: _amount}("");
+        if (!sent) revert WithdrawFailed();
+
+        emit FundsWithdrawn(_to, _amount);
+    }
+
+    /// @notice Fund the platform signer wallet for gas payments.
+    /// @param _amount Amount in wei
+    function fundSigner(uint256 _amount) external onlyMultisig nonReentrant {
+        (bool sent,) = platformSigner.call{value: _amount}("");
+        if (!sent) revert FundingFailed();
+
+        emit SignerFunded(_amount);
+    }
+
+    // =========================================================================
+    // ADMIN — Settings management
+    // =========================================================================
+
+    /// @notice Update ERC721 or ERC1155 template address.
+    ///         New events will use the new template. Old events are unaffected.
+    /// @param _eventType 0 = ERC721, 1 = ERC1155
+    /// @param _newTemplate Address of the new template contract
+    function setTemplate(uint256 _eventType, address _newTemplate) external onlyAdmin {
+        if (_newTemplate == address(0)) revert InvalidTemplate();
+
+        if (_eventType == 0) {
+            address old = erc721Template;
+            erc721Template = _newTemplate;
+            emit TemplateUpdated(0, old, _newTemplate);
+        } else if (_eventType == 1) {
+            address old = erc1155Template;
+            erc1155Template = _newTemplate;
+            emit TemplateUpdated(1, old, _newTemplate);
+        } else {
+            revert InvalidEventType();
+        }
+    }
+
+    function setCreateEventFee(uint256 _newFee) external onlyAdmin {
+        createEventFee = _newFee;
+        emit CreateFeeUpdated(_newFee);
+    }
+
+    function setPlatformFeeBps(uint256 _newFeeBps) external onlyAdmin {
+        platformFeeBps = _newFeeBps;
+        emit PlatformFeeUpdated(_newFeeBps);
+    }
+
+    function setPlatformSigner(address _newSigner) external onlyAdmin {
+        if (_newSigner == address(0)) revert InvalidAddress();
+        platformSigner = _newSigner;
+        emit PlatformSignerUpdated(_newSigner);
+    }
+
+    function setClaimContract(address _newClaimContract) external onlyAdmin {
+        if (_newClaimContract == address(0)) revert InvalidAddress();
+        claimContract = _newClaimContract;
+        emit ClaimContractUpdated(_newClaimContract);
+    }
+
+    function setMultisig(address _newMultisig) external onlyMultisig {
+        if (_newMultisig == address(0)) revert InvalidAddress();
+        multisig = _newMultisig;
+    }
+
+    function setAdmin(address _newAdmin) external onlyAdmin {
+        if (_newAdmin == address(0)) revert InvalidAddress();
+        admin = _newAdmin;
+    }
+
+    function togglePause() external onlyAdmin {
+        isPaused = !isPaused;
+        emit PlatformPaused(isPaused);
+    }
+
+    // =========================================================================
+    // VIEW FUNCTIONS
+    // =========================================================================
+
+    function totalEvents() external view returns (uint256) {
+        return allEvents.length;
+    }
+
+    function getEvents(uint256 _offset, uint256 _limit)
+        external
+        view
+        returns (address[] memory events)
+    {
+        uint256 end = _offset + _limit;
+        if (end > allEvents.length) end = allEvents.length;
+        uint256 length = end - _offset;
+
+        events = new address[](length);
+        for (uint256 i = 0; i < length; i++) {
+            events[i] = allEvents[_offset + i];
+        }
+    }
+
+    /// @notice Predict the address of an event before creation.
+    function predictEventAddress(
+        uint256 _eventType,
+        address _organizer
+    ) external view returns (address) {
+        bytes32 salt = keccak256(abi.encodePacked(
+            _organizer,
+            allEvents.length,
+            block.timestamp
+        ));
+        address template = _eventType == 0 ? erc721Template : erc1155Template;
+        return Clones.predictDeterministicAddress(template, salt);
+    }
+
+    function treasuryBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    // =========================================================================
+    // MODIFIERS
+    // =========================================================================
+
+    modifier onlyAdmin() {
+        if (msg.sender != admin) revert NotAdmin();
+        _;
+    }
+
+    modifier onlyMultisig() {
+        if (msg.sender != multisig) revert NotMultisig();
+        _;
+    }
+
+    modifier onlySigner() {
+        if (msg.sender != platformSigner) revert NotAdmin();
+        _;
+    }
+}

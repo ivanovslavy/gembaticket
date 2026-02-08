@@ -67,19 +67,20 @@ For event creation:
 ### 2.1 Architecture Overview
 
 ```
-Diamond Proxy v2 (EIP-2535)
-├── FactoryFacet v2        — Event creation
-├── TreasuryFacet          — Platform fees + gas funding
-└── AdminFacet             — Platform management
+PlatformRegistry.sol (singleton, regular contract)
+├── createEvent()          — Clone via EIP-1167 minimal proxy
+├── Treasury functions     — Receive fees, withdraw, fund signer
+├── Admin functions        — Set templates, fees, pause
+└── setTemplate()          — Upgrade logic for future events
 
-EventContract v2 (per-event, cloned)
+EventContract v2 (per-event, EIP-1167 clone)
 ├── ERC721 or ERC1155      — NFT tickets
 ├── Crypto payment logic   — GembaPay protocol embedded
 ├── Fiat proof minting     — Backend-verified mint
 ├── Ticket lifecycle       — activate/lock/transfer control
 └── Event management       — cancel/end/metadata
 
-ClaimContract (singleton)
+ClaimContract (singleton, regular contract)
 ├── Lock NFT for claim     — NFTs wait here
 ├── Claim with code        — User takes NFT
 └── Renounced ownership    — Nobody has control
@@ -362,97 +363,78 @@ function transferClaim(
 }
 ```
 
-### 2.4 FactoryFacet v2
+### 2.4 PlatformRegistry (replaces Diamond Proxy)
+
+Instead of a Diamond Proxy (EIP-2535) with separate facets, the platform uses a single
+PlatformRegistry contract that combines factory, treasury, and admin functions. Event
+contracts are deployed as EIP-1167 minimal proxy clones — 45 bytes of immutable bytecode
+that delegate to a template. This is simpler, cheaper, and more secure than Diamond.
+
+Template upgradeability: deploy a new EventContract template, call setTemplate() on
+PlatformRegistry, and all NEW events use the new logic. Old events remain on the old
+template (immutable, safe). This gives us upgrade capability without proxy risk.
 
 ```solidity
+// Key functions (see PlatformRegistry.sol for full implementation):
+
+// FACTORY — Clone event contracts via EIP-1167
 function createEvent(
-    bytes calldata _initData,
-    uint256 _eventType        // 0 = ERC721, 1 = ERC1155
-) external payable returns (address eventAddress) {
-    require(msg.value >= createEventFee, "Insufficient fee");
+    uint256 _eventType,       // 0 = ERC721, 1 = ERC1155
+    string calldata _eventName,
+    string calldata _baseURI,
+    uint256 _maxSupply,
+    uint256 _priceInNative
+) external payable returns (address eventAddress);
 
-    bytes32 salt = keccak256(abi.encodePacked(msg.sender, block.timestamp));
-
-    if (_eventType == 0) {
-        eventAddress = Clones.cloneDeterministic(erc721Template, salt);
-    } else {
-        eventAddress = Clones.cloneDeterministic(erc1155Template, salt);
-    }
-
-    IEventContract(eventAddress).initialize(
-        _initData, msg.sender, platform, treasury, claimContract
-    );
-
-    IClaimContract(claimContract).registerEvent(eventAddress);
-
-    (bool sent,) = treasury.call{value: msg.value}("");
-    require(sent, "Fee transfer failed");
-
-    allEvents.push(eventAddress);
-    emit EventCreated(eventAddress, msg.sender, _eventType);
-}
-
-// For fiat payment of creation (backend calls after GembaPay confirmation)
-// Gas paid by platform signer wallet from Treasury funds
+// FACTORY — Fiat payment (platform signer calls after GembaPay webhook)
 function createEventWithFiatProof(
-    bytes calldata _initData,
     uint256 _eventType,
+    string calldata _eventName,
+    string calldata _baseURI,
+    uint256 _maxSupply,
+    uint256 _priceInNative,
     address _organizer,
     bytes32 _paymentHash
-) external onlyPlatform returns (address) {
-    // Same logic, but without msg.value
-    // Gas covered by platform treasury
-}
+) external onlySigner returns (address eventAddress);
+
+// TREASURY — Receives platform fees from event contracts
+receive() external payable;
+function withdraw(address _to, uint256 _amount) external onlyMultisig;
+function fundSigner(uint256 _amount) external onlyMultisig;
+
+// ADMIN — Settings management
+function setTemplate(uint256 _eventType, address _newTemplate) external onlyAdmin;
+function setCreateEventFee(uint256 _newFee) external onlyAdmin;
+function setPlatformFeeBps(uint256 _newFeeBps) external onlyAdmin;
+function setPlatformSigner(address _newSigner) external onlyAdmin;
+function togglePause() external onlyAdmin;
 ```
 
-### 2.5 PlatformTreasury
+### 2.5 Contracts — Summary
 
-```solidity
-// Collects platform fees
-// Multisig management (3-of-3 or 2-of-3)
-// emergencyWithdraw with timelock
-// Funds platform signer wallet for gas costs
+| Contract | LOC (actual) | Role |
+|----------|-------------|------|
+| EventContract721 v2 | 209 | ERC721 template + payments + lifecycle (cloned) |
+| EventContract1155 v2 | 281 | ERC1155 template + ticket types + zones (cloned) |
+| ClaimContract | 181 | Autonomous NFT holding + claim (singleton) |
+| PlatformRegistry | 263 | Factory + Treasury + Admin (singleton) |
+| Interfaces | 44 | IEventContract + IClaimContract |
+| **Total** | **978** | **vs. current ~4150 LOC (76% reduction)** |
 
-receive() external payable {
-    emit FundsReceived(msg.sender, msg.value);
-}
-
-function withdraw(address _to, uint256 _amount) external onlyMultisig {
-    (bool sent,) = _to.call{value: _amount}("");
-    require(sent, "Withdraw failed");
-}
-
-// Fund the platform signer wallet for gas costs
-function fundPlatformSigner(uint256 _amount) external onlyMultisig {
-    (bool sent,) = platformSigner.call{value: _amount}("");
-    require(sent, "Funding failed");
-    emit PlatformSignerFunded(_amount);
-}
-```
-
-### 2.6 Contracts — Summary
-
-| Contract | LOC (est.) | Role |
-|----------|-----------|------|
-| EventContract721 v2 | ~350 | ERC721 + payments + lifecycle |
-| EventContract1155 v2 | ~400 | ERC1155 + ticket types + payments + lifecycle |
-| ClaimContract | ~150 | Autonomous NFT holding + claim |
-| FactoryFacet v2 | ~200 | Event deployment + registration |
-| TreasuryFacet | ~100 | Fee collection + multisig + gas funding |
-| AdminFacet | ~80 | Platform settings |
-| **Total** | **~1280** | **vs. current ~4150 LOC** |
-
-Reduction from ~4150 → ~1280 LOC (69% less code, smaller attack surface).
+Architecture: NO Diamond Proxy. PlatformRegistry is a regular contract. Only the
+EventContract clones are proxied (EIP-1167 minimal proxy — 45 bytes, immutable).
+ClaimContract is a regular contract with renounced ownership.
 
 ### 2.7 What We DO NOT Include (vs. v1)
 
 - ❌ Validator/Oracle contracts — GembaPay replaces them
 - ❌ QRModule on-chain — off-chain scanning (faster, free)
-- ❌ AdminModule as separate contract — embedded in EventContract
+- ❌ AdminModule as separate contract — embedded in PlatformRegistry
 - ❌ MintModule as separate contract — embedded in EventContract
 - ❌ ViewModule — frontend reads directly from contract
 - ❌ balanceThreshold — no balance accumulates in contract
 - ❌ Minter wallet management — no custodial wallets
+- ❌ Diamond Proxy (EIP-2535) — replaced by PlatformRegistry + EIP-1167 clones
 
 ---
 
@@ -1435,8 +1417,8 @@ Week 1:
   □ Unit tests for each contract
 
 Week 2:
-  □ FactoryFacet v2 (Diamond proxy, event deployment)
-  □ TreasuryFacet (fee collection, platform signer funding)
+  □ PlatformRegistry (factory + treasury + admin, EIP-1167 clones)
+  □ Integration tests (full flow: create event → buy → activate → claim)
   □ Integration tests (full flow)
   □ Slither + Mythril security audit
 
@@ -1568,7 +1550,7 @@ Infrastructure:
 | Scanner | ❌ No app exists | ✅ PWA + rotating QR |
 | Anti-fraud | ❌ Minimal | ✅ HMAC + device bind + activation lock |
 | Ticket transfer | ❌ Not supported | ✅ Free before scan, locked after |
-| Solidity LOC | ~4150 | ~1280 (69% reduction) |
+| Solidity LOC | ~4150 | ~978 (76% reduction) |
 | Backend LOC | ~12700 | ~8000 (est.) |
 | Regulation | ❌ CASP license needed | ✅ Clean non-custodial |
 | Refunds | ❌ No mechanism | ✅ Tracking + reputation + ban |

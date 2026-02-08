@@ -55,20 +55,20 @@ Read the development plan before contributing or reviewing code. It contains the
                  |     |     |
           +------+  +--+--+ +------+
           |         |     |        |
-    +-----v---+ +---v---+ +--v----+
-    | Factory  | | Event | | Claim |
-    | Facet    | | Contr.| | Contr.|
+    +-----v----+ +--v---+ +--v----+
+    | Platform | | Event | | Claim |
+    | Registry | | Contr.| | Contr.|
     +----------+ +-------+ +------+
 ```
 
 ### Layer Breakdown
 
 **Smart Contracts (Solidity 0.8.28)**
-- EventContract v2 — per-event ERC721/ERC1155 with embedded payment logic
-- ClaimContract — autonomous NFT holding with renounced ownership
-- FactoryFacet v2 — event deployment via Diamond Proxy (EIP-2535)
-- TreasuryFacet — platform fee collection and gas funding
-- Target: ~1,280 LOC total (down from ~4,150 in v1)
+- EventContract v2 — per-event ERC721/ERC1155 with embedded payment logic (EIP-1167 clones)
+- ClaimContract — autonomous NFT holding with renounced ownership (singleton)
+- PlatformRegistry — factory + treasury + admin in one contract (singleton)
+- No Diamond Proxy — templates upgradeable via setTemplate(), old events immutable
+- Target: ~978 LOC total (down from ~4,150 in v1)
 
 **Backend (Node.js + Express)**
 - REST API with JWT authentication
@@ -208,11 +208,10 @@ gembaticket/
 │   ├── EventContract721.sol
 │   ├── EventContract1155.sol
 │   ├── ClaimContract.sol
-│   ├── facets/
-│   │   ├── FactoryFacet.sol
-│   │   ├── TreasuryFacet.sol
-│   │   └── AdminFacet.sol
+│   ├── PlatformRegistry.sol
 │   └── interfaces/
+│       ├── IEventContract.sol
+│       └── IClaimContract.sol
 ├── test/                       # Contract tests (Hardhat)
 ├── scripts/                    # Deployment scripts
 ├── backend/
