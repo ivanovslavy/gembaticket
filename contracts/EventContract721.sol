@@ -75,7 +75,6 @@ contract EventContract721 is
     mapping(uint256 => bool) public ticketActivated;
     mapping(uint256 => address) public activatedBy;
     mapping(uint256 => bytes32) public ticketClaimHash;
-    uint256 private _claimNonce;
 
     // =========================================================================
     // INITIALIZER (replaces constructor for clones)
@@ -120,16 +119,18 @@ contract EventContract721 is
     ///         Works for both crypto and fiat — GembaPay handles all payments.
     /// @param _buyer Buyer address (for claim tracking)
     /// @param _paymentHash Keccak256 of GembaPay payment ID (on-chain proof)
+    /// @param _claimHash Keccak256 of backend-generated claim code
     function mintWithPaymentProof(
         address _buyer,
-        bytes32 _paymentHash
+        bytes32 _paymentHash,
+        bytes32 _claimHash
     ) external onlyPlatform nonReentrant {
         if (!saleActive) revert SaleNotActive();
         if (isEventCanceled) revert EventCanceled();
         if (totalMinted >= maxSupply) revert MaxSupplyReached();
         if (_buyer == address(0)) revert InvalidAddress();
 
-        uint256 tokenId = _mintTicket(_buyer);
+        uint256 tokenId = _mintTicket(_buyer, _claimHash);
 
         emit TicketMinted(_buyer, tokenId, _paymentHash);
     }
@@ -138,22 +139,14 @@ contract EventContract721 is
     // INTERNAL MINT — Always mints to ClaimContract
     // =========================================================================
 
-    function _mintTicket(address _buyer) internal returns (uint256 tokenId) {
+    function _mintTicket(address _buyer, bytes32 _claimHash) internal returns (uint256 tokenId) {
         tokenId = ++totalMinted;
 
-        bytes32 claimHash = keccak256(abi.encodePacked(
-            address(this),
-            tokenId,
-            _buyer,
-            block.timestamp,
-            block.prevrandao,
-            ++_claimNonce
-        ));
-        ticketClaimHash[tokenId] = claimHash;
+        ticketClaimHash[tokenId] = _claimHash;
 
         _safeMint(claimContract, tokenId);
 
-        IClaimContract(claimContract).lockForClaim(claimHash, tokenId, _buyer);
+        IClaimContract(claimContract).lockForClaim(_claimHash, tokenId, _buyer);
     }
 
     // =========================================================================

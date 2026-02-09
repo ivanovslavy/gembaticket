@@ -2,7 +2,7 @@
 
 **Project:** GembaTicket v2 — Non-Custodial NFT Ticketing Platform  
 **Auditor:** Slavcho Ivanov, Managing Director, GEMBA EOOD (EIK: 208656371)  
-**Date:** February 9, 2025  
+**Date:** February 9, 2026  
 **Solidity Version:** 0.8.28 (locked pragma)  
 **Compiler Optimization:** Enabled, 200 runs  
 **Repository:** https://github.com/ivanovslavy/gembaticket
@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-This report documents the security analysis of the GembaTicket v2 smart contract system — a non-custodial, payment-agnostic NFT ticketing platform. The contracts were subjected to both static analysis (Slither v0.11.5) and symbolic execution (Mythril v0.24.8), covering all known vulnerability classes.
+This report documents the security analysis of the GembaTicket v2 smart contract system — a non-custodial, payment-agnostic NFT ticketing platform. The contracts were subjected to static analysis (Slither v0.11.5), symbolic execution (Mythril v0.24.8), and comprehensive functional testing (121 assertions, 100% pass rate).
 
 **Final Results:**
 
@@ -19,8 +19,9 @@ This report documents the security analysis of the GembaTicket v2 smart contract
 |------|------|--------|-----|---------------|
 | Slither v0.11.5 | 0 | 0 | 3 (false positives) | 67 (dependencies) |
 | Mythril v0.24.8 | 0 | 0 | 0 | 0 |
+| Functional Tests | — | — | — | 121/121 passed |
 
-**Verdict:** All contracts pass security analysis with zero actionable findings. The 3 remaining Slither Low findings are confirmed false positives (timestamp detector misidentifying array bounds and address comparisons).
+**Verdict:** All contracts pass security analysis with zero actionable findings. The 3 remaining Slither Low findings are confirmed false positives (timestamp detector misidentifying array bounds and address comparisons). All 121 functional test assertions pass on Hardhat localhost network.
 
 ---
 
@@ -30,15 +31,15 @@ This report documents the security analysis of the GembaTicket v2 smart contract
 
 | Contract | File | LOC | Type | Deployed Size |
 |----------|------|-----|------|---------------|
-| PlatformRegistry | `contracts/PlatformRegistry.sol` | 221 | Singleton | 5,190 bytes |
-| EventContract721 | `contracts/EventContract721.sol` | 179 | EIP-1167 Template | 8,909 bytes |
-| EventContract1155 | `contracts/EventContract1155.sol` | 249 | EIP-1167 Template | 10,658 bytes |
-| ClaimContract | `contracts/ClaimContract.sol` | 185 | Singleton | 3,690 bytes |
-| IClaimContract | `contracts/interfaces/IClaimContract.sol` | 22 | Interface | — |
-| IEventContract | `contracts/interfaces/IEventContract.sol` | 18 | Interface | — |
-| **Total** | | **874** | | **28,447 bytes** |
+| PlatformRegistry | `contracts/PlatformRegistry.sol` | 215 | Singleton | 5,190 bytes |
+| EventContract721 | `contracts/EventContract721.sol` | 173 | EIP-1167 Template | 8,835 bytes |
+| EventContract1155 | `contracts/EventContract1155.sol` | 243 | EIP-1167 Template | 10,533 bytes |
+| ClaimContract | `contracts/ClaimContract.sol` | 186 | Singleton | 3,690 bytes |
+| IClaimContract | `contracts/interfaces/IClaimContract.sol` | 28 | Interface | — |
+| IEventContract | `contracts/interfaces/IEventContract.sol` | 12 | Interface | — |
+| **Total** | | **857** | | **28,248 bytes** |
 
-All contracts are well below the 24,576-byte Spurious Dragon deployment limit. The largest contract (EventContract1155) uses 43.4% of the limit.
+All contracts are well below the 24,576-byte Spurious Dragon deployment limit. The largest contract (EventContract1155) uses 42.9% of the limit.
 
 ### 2.2 Dependencies
 
@@ -107,7 +108,23 @@ GembaTicket v2 follows a **payment-agnostic** architecture. The smart contracts 
      └──────────────────────┘
 ```
 
-### 3.3 Key Security Properties
+### 3.3 Claim Flow (Backend ↔ Contract)
+
+The claim system uses backend-generated claim codes to link off-chain purchases to on-chain NFTs:
+
+```
+1. Backend generates:  claimCode = crypto.randomBytes(32).toString('hex')
+2. Backend computes:   claimHash = keccak256(claimCode)
+3. Backend calls:      mintWithPaymentProof(buyer, paymentHash, claimHash)
+4. Contract mints NFT to ClaimContract, registers claimHash
+5. Backend sends claimCode to buyer (email/SMS/app)
+6. User calls:         claim(claimCode, destinationWallet)
+7. Contract verifies:  keccak256(claimCode) == stored claimHash → transfers NFT
+```
+
+The claim code is the only secret. The claimHash on-chain is a one-way hash — knowing it does not reveal the claim code. This design ensures that only the intended buyer (who received the claim code) can claim their NFT.
+
+### 3.4 Key Security Properties
 
 1. **Non-custodial:** No contract holds user funds. GembaPay splits payments instantly.
 2. **Payment-agnostic:** Zero `msg.value` in event contracts. No `payable` functions for ticket purchases.
@@ -167,6 +184,18 @@ Mythril performs symbolic execution and SMT solving to detect:
 - Exception handling issues
 - Access control violations
 
+### 4.3 Functional Testing
+
+**Framework:** Hardhat v2.28.4 + ethers.js v6  
+**Network:** Hardhat localhost (chainId 31337)  
+**Test scripts:** 3 scripts, 121 total assertions
+
+| Script | Coverage | Assertions |
+|--------|----------|------------|
+| `test-erc721-lifecycle.js` | Full ERC721 ticket lifecycle | 38 |
+| `test-erc1155-lifecycle.js` | Zone-based ticket types, ERC1155 lifecycle | 37 |
+| `test-platform-security.js` | Access control, admin functions, edge cases | 46 |
+
 ---
 
 ## 5. Findings
@@ -177,7 +206,7 @@ Mythril performs symbolic execution and SMT solving to detect:
 ```
 Total number of contracts in source files: 6
 Number of contracts in dependencies: 32
-Source lines of code (SLOC) in source files: 885
+Source lines of code (SLOC) in source files: 857
 Source lines of code (SLOC) in dependencies: 2470
 Number of assembly lines: 0
 Number of optimization issues: 0
@@ -246,10 +275,45 @@ Mythril's symbolic execution engine explored all reachable execution paths withi
 - No integer overflow/underflow
 - No reentrancy vectors
 - No unprotected self-destruct
-- No unchecked external calls  
+- No unchecked external calls
 - No transaction order dependency
 - No exploitable timestamp dependency
 - No access control violations
+
+### 5.3 Functional Test Results
+
+```
+╔════════════════════════════════════════════╗
+║   ALL TESTS PASSED ✓                       ║
+╚════════════════════════════════════════════╝
+
+test-erc721-lifecycle.js:    38 passed, 0 failed ✓
+test-erc1155-lifecycle.js:   37 passed, 0 failed ✓
+test-platform-security.js:  46 passed, 0 failed ✓
+Total:                      121 passed, 0 failed ✓
+```
+
+**Test coverage includes:**
+
+- **Lifecycle:** Create event → toggle sale → mint with payment proof → claim NFT → activate ticket → transfer lock → end event → transfer unlock
+- **ERC1155 zones:** Ticket type creation (General/VIP/Backstage/All Access) → zone-level verification → type max supply → type toggle
+- **Access control:** All role-gated functions tested with unauthorized callers (attacker, wrong role)
+- **Admin operations:** Pause/unpause → template upgrade → treasury withdraw → fund signer → role transfer
+- **ClaimContract autonomy:** Factory lock (one-time set) → unregistered event rejection → claim code verification → transfer claim → double-claim prevention
+- **Input validation:** Zero address checks on all parameters → constructor validation → max supply enforcement → duplicate prevention
+- **Edge cases:** Cancel event → mint after cancel/end → end after cancel → pagination → role transfer and old role lockout
+
+### 5.4 Bug Found and Fixed During Testing
+
+**Claim Hash Mismatch (Critical — Fixed)**
+
+During test development, a critical bug was discovered in the claim flow:
+
+- `_mintTicket()` generated claimHash on-chain using: `keccak256(address(this), tokenId, buyer, timestamp, prevrandao, nonce)`
+- `claim()` looked up claims using: `keccak256(abi.encodePacked(claimCode))`
+- These two hashes could never match — `claim()` would always revert with `InvalidClaimCode`
+
+**Fix:** `mintWithPaymentProof()` now accepts `_claimHash` as a parameter from the backend. The backend generates a random claim code, computes its keccak256 hash, and passes it to the contract during minting. When the user calls `claim(claimCode, wallet)`, the contract hashes the claim code and matches it against the stored hash. This also removes the `_claimNonce` state variable and on-chain randomness dependency.
 
 ---
 
@@ -257,16 +321,20 @@ Mythril's symbolic execution engine explored all reachable execution paths withi
 
 ### 6.1 Access Control
 
-| Function | Allowed Caller | Verified |
-|----------|---------------|----------|
+| Function | Allowed Caller | Tested |
+|----------|---------------|--------|
 | `createEvent()` | `platformSigner` only | ✓ |
 | `mintWithPaymentProof()` | `platform` (signer) only | ✓ |
 | `activateTicket()` | `platform` (signer) only | ✓ |
 | `cancelEvent()` / `endEvent()` | `owner` (organizer) only | ✓ |
 | `toggleSale()` | `owner` (organizer) only | ✓ |
+| `createTicketType()` | `owner` (organizer) only | ✓ |
 | `withdraw()` / `fundSigner()` | `multisig` only | ✓ |
 | `setTemplate()` / `setPlatformSigner()` | `admin` only | ✓ |
+| `setAdmin()` | `admin` only | ✓ |
+| `setMultisig()` | `multisig` only | ✓ |
 | `claim()` | Anyone with valid claim code | ✓ |
+| `transferClaim()` | Original buyer or event contract | ✓ |
 | `setFactory()` | Anyone (one-time, then locked) | ✓ |
 
 ### 6.2 Reentrancy Protection
@@ -289,8 +357,8 @@ All public/external functions validate:
 
 ### 6.4 Transfer Restrictions
 
-| State | Transfer Allowed | Verified |
-|-------|-----------------|----------|
+| State | Transfer Allowed | Tested |
+|-------|-----------------|--------|
 | Before activation | ✓ Yes (via ClaimContract or direct) | ✓ |
 | After activation, before event end | ✗ Locked (`TransferLocked`) | ✓ |
 | After event end | ✓ Yes (collectible value) | ✓ |
@@ -318,14 +386,15 @@ Per-event clone cost (~45,000 gas) vs full contract deployment (~1,200,000+ gas)
 
 - [x] Lock pragma to exact `0.8.28` (no floating `^`)
 - [x] Add `address(0)` validation on all address parameters
-- [x] Add claim nonce to prevent hash collision (theoretical)
 - [x] CEI pattern in all functions with external calls
 - [x] Events for all state-changing admin functions
 - [x] Remove all payment logic from contracts (payment-agnostic architecture)
+- [x] Fix claim hash: backend-generated claim codes with on-chain hash verification
+- [x] 121 functional test assertions covering lifecycle, security, and edge cases
 
 ### 8.2 Recommended for Production
 
-- [ ] Deploy to testnet (Sepolia) and run integration tests
+- [ ] Deploy to testnet (Sepolia) and run integration tests with GembaPay
 - [ ] Multi-sig wallet for `multisig` role (Gnosis Safe recommended)
 - [ ] Separate wallets for `admin`, `multisig`, and `platformSigner`
 - [ ] Monitor platform signer balance for gas funding
@@ -337,9 +406,9 @@ Per-event clone cost (~45,000 gas) vs full contract deployment (~1,200,000+ gas)
 
 ## 9. Conclusion
 
-The GembaTicket v2 smart contract system demonstrates strong security posture across all analyzed dimensions. The payment-agnostic architecture eliminates the most common class of DeFi vulnerabilities (fund handling, price manipulation, flash loans) by design. The minimal contract surface (874 SLOC across 4 contracts) reduces attack surface significantly compared to the original v1 system (4,150 SLOC across 32 contracts).
+The GembaTicket v2 smart contract system demonstrates strong security posture across all analyzed dimensions. The payment-agnostic architecture eliminates the most common class of DeFi vulnerabilities (fund handling, price manipulation, flash loans) by design. The minimal contract surface (857 SLOC across 4 contracts) reduces attack surface significantly compared to the original v1 system (4,150 SLOC across 32 contracts — a 79% reduction).
 
-Both Slither and Mythril confirm zero actionable security findings. The contracts are ready for testnet deployment and integration testing.
+Both Slither and Mythril confirm zero actionable security findings. All 121 functional test assertions pass. A critical claim hash mismatch bug was identified and fixed during the testing phase. The contracts are ready for testnet deployment and integration testing.
 
 ---
 
@@ -350,4 +419,4 @@ Managing Director, GEMBA EOOD
 EIK: 208656371  
 Varna, Bulgaria
 
-February 9, 2025
+February 9, 2026

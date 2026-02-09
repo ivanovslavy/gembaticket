@@ -92,7 +92,6 @@ contract EventContract1155 is
     mapping(uint256 => bool) public ticketActivated;
     mapping(uint256 => address) public activatedBy;
     mapping(uint256 => bytes32) public ticketClaimHash;
-    uint256 private _claimNonce;
 
     // =========================================================================
     // INITIALIZER
@@ -171,10 +170,12 @@ contract EventContract1155 is
     /// @param _buyer Buyer address
     /// @param _typeId Ticket type
     /// @param _paymentHash GembaPay payment ID hash
+    /// @param _claimHash Keccak256 of backend-generated claim code
     function mintWithPaymentProof(
         address _buyer,
         uint256 _typeId,
-        bytes32 _paymentHash
+        bytes32 _paymentHash,
+        bytes32 _claimHash
     ) external onlyPlatform nonReentrant {
         if (!saleActive) revert SaleNotActive();
         if (isEventCanceled) revert EventCanceled();
@@ -185,7 +186,7 @@ contract EventContract1155 is
         if (tt.minted >= tt.maxSupply) revert TypeMaxSupplyReached();
         if (totalMinted >= maxSupply) revert MaxSupplyReached();
 
-        uint256 tokenId = _mintTicket(_buyer, _typeId);
+        uint256 tokenId = _mintTicket(_buyer, _typeId, _claimHash);
 
         emit TicketMinted(_buyer, tokenId, _typeId, _paymentHash);
     }
@@ -194,26 +195,18 @@ contract EventContract1155 is
     // INTERNAL MINT
     // =========================================================================
 
-    function _mintTicket(address _buyer, uint256 _typeId) internal returns (uint256 tokenId) {
+    function _mintTicket(address _buyer, uint256 _typeId, bytes32 _claimHash) internal returns (uint256 tokenId) {
         tokenId = ++totalMinted;
         ticketTypes[_typeId].minted++;
         ticketType[tokenId] = _typeId;
 
-        bytes32 claimHash = keccak256(abi.encodePacked(
-            address(this),
-            tokenId,
-            _buyer,
-            block.timestamp,
-            block.prevrandao,
-            ++_claimNonce
-        ));
-        ticketClaimHash[tokenId] = claimHash;
+        ticketClaimHash[tokenId] = _claimHash;
 
         // Mint to ClaimContract (amount = 1, each ticket is unique)
         _mint(claimContract, tokenId, 1, "");
 
         // Register claim
-        IClaimContract(claimContract).lockForClaimERC1155(claimHash, tokenId, _buyer);
+        IClaimContract(claimContract).lockForClaimERC1155(_claimHash, tokenId, _buyer);
     }
 
     // =========================================================================
