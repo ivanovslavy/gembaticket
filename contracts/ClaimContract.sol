@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
@@ -25,6 +25,7 @@ contract ClaimContract is IERC721Receiver, IERC1155Receiver, ERC165 {
     error AlreadyClaimed();
     error NotAuthorized();
     error FactoryAlreadySet();
+    error InvalidAddress();
 
     // =========================================================================
     // EVENTS
@@ -74,6 +75,7 @@ contract ClaimContract is IERC721Receiver, IERC1155Receiver, ERC165 {
     /// @notice Set the factory (PlatformRegistry) address. Can only be called once.
     /// @param _factory Address of the PlatformRegistry contract
     function setFactory(address _factory) external {
+        if (_factory == address(0)) revert InvalidAddress();
         if (factory != address(0)) revert FactoryAlreadySet();
         factory = _factory;
         emit FactorySet(_factory);
@@ -106,6 +108,7 @@ contract ClaimContract is IERC721Receiver, IERC1155Receiver, ERC165 {
     ) external {
         if (!registeredEvents[msg.sender]) revert NotRegisteredEvent();
         if (claims[_claimHash].eventContract != address(0)) revert ClaimAlreadyExists();
+        if (_buyer == address(0)) revert InvalidAddress();
 
         claims[_claimHash] = ClaimData({
             eventContract: msg.sender,
@@ -130,6 +133,7 @@ contract ClaimContract is IERC721Receiver, IERC1155Receiver, ERC165 {
     ) external {
         if (!registeredEvents[msg.sender]) revert NotRegisteredEvent();
         if (claims[_claimHash].eventContract != address(0)) revert ClaimAlreadyExists();
+        if (_buyer == address(0)) revert InvalidAddress();
 
         claims[_claimHash] = ClaimData({
             eventContract: msg.sender,
@@ -154,6 +158,7 @@ contract ClaimContract is IERC721Receiver, IERC1155Receiver, ERC165 {
         string calldata _claimCode,
         address _destinationWallet
     ) external {
+        if (_destinationWallet == address(0)) revert InvalidAddress();
         bytes32 claimHash = keccak256(abi.encodePacked(_claimCode));
         ClaimData storage data = claims[claimHash];
 
@@ -161,6 +166,8 @@ contract ClaimContract is IERC721Receiver, IERC1155Receiver, ERC165 {
         if (data.claimed) revert AlreadyClaimed();
 
         data.claimed = true;
+
+        emit NFTClaimed(claimHash, _destinationWallet, data.tokenId, data.eventContract);
 
         if (data.isERC1155) {
             IERC1155(data.eventContract).safeTransferFrom(
@@ -177,8 +184,6 @@ contract ClaimContract is IERC721Receiver, IERC1155Receiver, ERC165 {
                 data.tokenId
             );
         }
-
-        emit NFTClaimed(claimHash, _destinationWallet, data.tokenId, data.eventContract);
     }
 
     /// @notice Transfer claim ownership to a new buyer (before NFT is claimed).

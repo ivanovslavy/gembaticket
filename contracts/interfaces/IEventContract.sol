@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 /// @notice Interface for EventContract721 and EventContract1155 common functions
 interface IEventContract {

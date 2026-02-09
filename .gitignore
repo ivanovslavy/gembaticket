@@ -17,3 +17,9 @@ logs/
 coverage/
 coverage.json
 .ipfs/
+
+# Slither reports
+reports/
+
+# Deployment outputs
+deployed/

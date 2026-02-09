@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/IClaimContract.sol";
 
-/// @title EventContract1155 — ERC1155 ticket contract with zone-based ticket types
-/// @notice Each token ID is a unique ticket. ticketType maps each token to its tier.
-///         Supports multiple tiers: General (0), VIP (1), Backstage (2), All Access (3).
+/// @title EventContract1155 — ERC1155 ticket contract with zone-based types (payment-agnostic)
+/// @notice Does NOT handle payments. All payments processed by GembaPay off-chain.
+///         Each token ID is a unique ticket. ticketType maps each token to its tier.
 /// @dev Cloned per-event via EIP-1167. Uses unique token IDs (balance = 1 each).
 contract EventContract1155 is
     Initializable,
@@ -25,38 +25,35 @@ contract EventContract1155 is
     error EventCanceled();
     error EventEnded();
     error EventAlreadyEnded();
-    error InsufficientPayment();
     error MaxSupplyReached();
     error TypeMaxSupplyReached();
     error TransferLocked();
     error AlreadyActivated();
-    error PaymentFailed();
     error InvalidTicketType();
     error TicketTypeExists();
+    error InvalidAddress();
 
     // =========================================================================
     // EVENTS
     // =========================================================================
 
-    event TicketPurchased(
+    event TicketMinted(
         address indexed buyer,
         uint256 indexed tokenId,
         uint256 ticketTypeId,
-        uint256 price,
-        string paymentType
+        bytes32 paymentHash
     );
-    event FiatPaymentRecorded(bytes32 indexed paymentHash, uint256 indexed tokenId);
     event TicketActivated(uint256 indexed tokenId, address indexed holder);
     event TicketTypeCreated(
         uint256 indexed typeId,
         string name,
-        uint256 price,
         uint256 maxSupply,
         uint256 zoneLevel
     );
     event EventCanceledEvent(uint256 timestamp);
     event EventEndedEvent(uint256 timestamp);
     event SaleToggled(bool active);
+    event PlatformUpdated(address newPlatform);
 
     // =========================================================================
     // STRUCTS
@@ -64,7 +61,6 @@ contract EventContract1155 is
 
     struct TicketType {
         string name;       // "General", "VIP", "Backstage", "All Access"
-        uint256 price;     // Price in native token (wei)
         uint256 maxSupply; // Max tickets of this type
         uint256 minted;    // Tickets minted of this type
         uint256 zoneLevel; // 0=General, 1=VIP, 2=Backstage, 3=AllAccess
@@ -77,11 +73,9 @@ contract EventContract1155 is
 
     address public owner;
     address public platform;
-    address public treasury;
     address public claimContract;
 
     string public eventName;
-    uint256 public platformFeeBps;
     uint256 public totalMinted;
     uint256 public maxSupply; // Global cap across all types
 
@@ -98,6 +92,7 @@ contract EventContract1155 is
     mapping(uint256 => bool) public ticketActivated;
     mapping(uint256 => address) public activatedBy;
     mapping(uint256 => bytes32) public ticketClaimHash;
+    uint256 private _claimNonce;
 
     // =========================================================================
     // INITIALIZER
@@ -107,30 +102,28 @@ contract EventContract1155 is
     /// @param _eventName Human-readable event name
     /// @param _uri Base URI for metadata
     /// @param _maxSupply Global maximum tickets across all types
-    /// @param _platformFeeBps Platform fee in basis points (500 = 5%)
     /// @param _owner Organizer address
     /// @param _platform Platform signer address
-    /// @param _treasury Platform treasury address
     /// @param _claimContract ClaimContract address
     function initialize(
         string calldata _eventName,
         string calldata _uri,
         uint256 _maxSupply,
-        uint256 _platformFeeBps,
         address _owner,
         address _platform,
-        address _treasury,
         address _claimContract
     ) external initializer {
         __ERC1155_init(_uri);
         __ReentrancyGuard_init();
 
+        if (_owner == address(0)) revert InvalidAddress();
+        if (_platform == address(0)) revert InvalidAddress();
+        if (_claimContract == address(0)) revert InvalidAddress();
+
         eventName = _eventName;
         maxSupply = _maxSupply;
-        platformFeeBps = _platformFeeBps;
         owner = _owner;
         platform = _platform;
-        treasury = _treasury;
         claimContract = _claimContract;
         saleActive = false;
     }
@@ -142,13 +135,11 @@ contract EventContract1155 is
     /// @notice Create a ticket type (zone/tier).
     /// @param _typeId Unique type identifier (0=General, 1=VIP, etc.)
     /// @param _name Display name
-    /// @param _price Price in native token (wei)
     /// @param _typeMaxSupply Maximum tickets of this type
     /// @param _zoneLevel Zone access level (higher = more access)
     function createTicketType(
         uint256 _typeId,
         string calldata _name,
-        uint256 _price,
         uint256 _typeMaxSupply,
         uint256 _zoneLevel
     ) external onlyOwner {
@@ -156,7 +147,6 @@ contract EventContract1155 is
 
         ticketTypes[_typeId] = TicketType({
             name: _name,
-            price: _price,
             maxSupply: _typeMaxSupply,
             minted: 0,
             zoneLevel: _zoneLevel,
@@ -164,7 +154,7 @@ contract EventContract1155 is
         });
         ticketTypeCount++;
 
-        emit TicketTypeCreated(_typeId, _name, _price, _typeMaxSupply, _zoneLevel);
+        emit TicketTypeCreated(_typeId, _name, _typeMaxSupply, _zoneLevel);
     }
 
     /// @notice Toggle a ticket type active/inactive
@@ -174,70 +164,30 @@ contract EventContract1155 is
     }
 
     // =========================================================================
-    // CRYPTO PAYMENT
+    // MINT — Platform signer mints after GembaPay payment confirmation
     // =========================================================================
 
-    /// @notice Buy a ticket with native token. Specify which ticket type.
-    /// @param _typeId Ticket type to purchase
-    function buyTicketCrypto(uint256 _typeId) external payable nonReentrant {
-        if (!saleActive) revert SaleNotActive();
-        if (isEventCanceled) revert EventCanceled();
-        if (isEventEnded) revert EventEnded();
-
-        TicketType storage tt = ticketTypes[_typeId];
-        if (tt.maxSupply == 0 || !tt.active) revert InvalidTicketType();
-        if (tt.minted >= tt.maxSupply) revert TypeMaxSupplyReached();
-        if (totalMinted >= maxSupply) revert MaxSupplyReached();
-        if (msg.value < tt.price) revert InsufficientPayment();
-
-        // Calculate split
-        uint256 fee = (tt.price * platformFeeBps) / 10000;
-        uint256 organizerAmount = tt.price - fee;
-
-        // Effects
-        uint256 tokenId = _mintTicket(msg.sender, _typeId);
-
-        // Interactions
-        (bool sentOrganizer,) = owner.call{value: organizerAmount}("");
-        if (!sentOrganizer) revert PaymentFailed();
-
-        (bool sentTreasury,) = treasury.call{value: fee}("");
-        if (!sentTreasury) revert PaymentFailed();
-
-        uint256 excess = msg.value - tt.price;
-        if (excess > 0) {
-            (bool refunded,) = msg.sender.call{value: excess}("");
-            if (!refunded) revert PaymentFailed();
-        }
-
-        emit TicketPurchased(msg.sender, tokenId, _typeId, tt.price, "crypto");
-    }
-
-    // =========================================================================
-    // FIAT PAYMENT
-    // =========================================================================
-
-    /// @notice Mint a ticket for fiat payment. Called by platform signer.
+    /// @notice Mint a ticket after payment confirmed by GembaPay webhook.
     /// @param _buyer Buyer address
     /// @param _typeId Ticket type
     /// @param _paymentHash GembaPay payment ID hash
-    function mintWithFiatProof(
+    function mintWithPaymentProof(
         address _buyer,
         uint256 _typeId,
         bytes32 _paymentHash
     ) external onlyPlatform nonReentrant {
         if (!saleActive) revert SaleNotActive();
         if (isEventCanceled) revert EventCanceled();
+        if (_buyer == address(0)) revert InvalidAddress();
 
         TicketType storage tt = ticketTypes[_typeId];
-        if (tt.maxSupply == 0) revert InvalidTicketType();
+        if (tt.maxSupply == 0 || !tt.active) revert InvalidTicketType();
         if (tt.minted >= tt.maxSupply) revert TypeMaxSupplyReached();
         if (totalMinted >= maxSupply) revert MaxSupplyReached();
 
         uint256 tokenId = _mintTicket(_buyer, _typeId);
 
-        emit TicketPurchased(_buyer, tokenId, _typeId, 0, "fiat");
-        emit FiatPaymentRecorded(_paymentHash, tokenId);
+        emit TicketMinted(_buyer, tokenId, _typeId, _paymentHash);
     }
 
     // =========================================================================
@@ -254,7 +204,8 @@ contract EventContract1155 is
             tokenId,
             _buyer,
             block.timestamp,
-            block.prevrandao
+            block.prevrandao,
+            ++_claimNonce
         ));
         ticketClaimHash[tokenId] = claimHash;
 
@@ -274,9 +225,6 @@ contract EventContract1155 is
         if (ticketActivated[_tokenId]) revert AlreadyActivated();
 
         ticketActivated[_tokenId] = true;
-
-        // For ERC1155, find the owner (whoever has balance of this tokenId)
-        // Since balance is always 1, the holder is whoever has it
         activatedBy[_tokenId] = _getHolder(_tokenId);
 
         emit TicketActivated(_tokenId, activatedBy[_tokenId]);
@@ -289,7 +237,6 @@ contract EventContract1155 is
         uint256[] memory ids,
         uint256[] memory values
     ) internal override {
-        // Check each token in the batch
         if (from != address(0)) {
             for (uint256 i = 0; i < ids.length; i++) {
                 if (!isEventEnded && ticketActivated[ids[i]]) {
@@ -305,6 +252,7 @@ contract EventContract1155 is
     // EVENT MANAGEMENT
     // =========================================================================
 
+    /// @notice Cancel the event. Refunds handled off-chain via GembaPay.
     function cancelEvent() external onlyOwner {
         if (isEventEnded) revert EventAlreadyEnded();
         isEventCanceled = true;
@@ -331,14 +279,15 @@ contract EventContract1155 is
     }
 
     function setPlatform(address _newPlatform) external onlyPlatform {
+        if (_newPlatform == address(0)) revert InvalidAddress();
         platform = _newPlatform;
+        emit PlatformUpdated(_newPlatform);
     }
 
     // =========================================================================
     // VIEW FUNCTIONS
     // =========================================================================
 
-    /// @notice Get ticket info for scanner
     function getTicketInfo(uint256 _tokenId)
         external
         view
@@ -357,13 +306,11 @@ contract EventContract1155 is
         claimHash = ticketClaimHash[_tokenId];
     }
 
-    /// @notice Get ticket type details
     function getTicketTypeInfo(uint256 _typeId)
         external
         view
         returns (
             string memory name,
-            uint256 price,
             uint256 typeMaxSupply,
             uint256 minted,
             uint256 zoneLevel,
@@ -372,7 +319,6 @@ contract EventContract1155 is
     {
         TicketType storage tt = ticketTypes[_typeId];
         name = tt.name;
-        price = tt.price;
         typeMaxSupply = tt.maxSupply;
         minted = tt.minted;
         zoneLevel = tt.zoneLevel;
@@ -401,11 +347,8 @@ contract EventContract1155 is
         ended = isEventEnded;
     }
 
-    /// @dev Find holder of a specific tokenId (balance = 1).
-    ///      ClaimContract or a user wallet.
     function _getHolder(uint256 _tokenId) internal view returns (address) {
         if (balanceOf(claimContract, _tokenId) == 1) return claimContract;
-        // If not in ClaimContract, it was claimed — we track via activatedBy
         return address(0);
     }
 

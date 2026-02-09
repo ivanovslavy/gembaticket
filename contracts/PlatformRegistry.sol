@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IClaimContract.sol";
 
-/// @title PlatformRegistry — Event factory, treasury, and admin in one contract
-/// @notice Replaces Diamond Proxy. Deploys events via EIP-1167 minimal clones.
-///         Template upgrade: deploy new template → setTemplate() → new events use it.
-///         Old events remain on old template (immutable, safe).
-/// @dev Only 2 contracts are proxied (event clones). This and ClaimContract are regular.
+/// @title PlatformRegistry — Event factory and admin (payment-agnostic)
+/// @notice All payments (event creation fees, ticket sales) handled by GembaPay off-chain.
+///         This contract only deploys event clones and manages platform settings.
+///         Platform signer calls createEvent() after GembaPay confirms payment.
+/// @dev Only 2 contracts are proxied (event clones via EIP-1167).
+///      PlatformRegistry and ClaimContract are regular contracts.
 contract PlatformRegistry is ReentrancyGuard {
 
     // =========================================================================
@@ -18,9 +19,9 @@ contract PlatformRegistry is ReentrancyGuard {
 
     error NotAdmin();
     error NotMultisig();
+    error NotSigner();
     error InvalidTemplate();
     error InvalidAddress();
-    error InsufficientFee();
     error WithdrawFailed();
     error FundingFailed();
     error EventCreationFailed();
@@ -35,22 +36,18 @@ contract PlatformRegistry is ReentrancyGuard {
         address indexed eventAddress,
         address indexed organizer,
         uint256 eventType,
-        string eventName
-    );
-    event EventCreatedWithFiat(
-        address indexed eventAddress,
-        address indexed organizer,
+        string eventName,
         bytes32 paymentHash
     );
     event TemplateUpdated(uint256 indexed eventType, address oldTemplate, address newTemplate);
-    event CreateFeeUpdated(uint256 newFee);
-    event PlatformFeeUpdated(uint256 newFeeBps);
     event PlatformSignerUpdated(address newSigner);
     event ClaimContractUpdated(address newClaimContract);
     event FundsReceived(address indexed from, uint256 amount);
     event FundsWithdrawn(address indexed to, uint256 amount);
     event SignerFunded(uint256 amount);
     event PlatformPaused(bool paused);
+    event AdminUpdated(address newAdmin);
+    event MultisigUpdated(address newMultisig);
 
     // =========================================================================
     // STATE
@@ -62,7 +59,7 @@ contract PlatformRegistry is ReentrancyGuard {
     // Multisig for treasury withdrawals (can be same as admin initially)
     address public multisig;
 
-    // Platform signer wallet (pays gas for fiat mints, activations)
+    // Platform signer wallet (pays gas for mints, activations, event creation)
     address public platformSigner;
 
     // ClaimContract reference
@@ -71,10 +68,6 @@ contract PlatformRegistry is ReentrancyGuard {
     // Template contracts for cloning
     address public erc721Template;
     address public erc1155Template;
-
-    // Fees
-    uint256 public createEventFee;     // Fee to create event (in native token)
-    uint256 public platformFeeBps;     // Platform fee on ticket sales (basis points)
 
     // State
     bool public isPaused;
@@ -94,95 +87,62 @@ contract PlatformRegistry is ReentrancyGuard {
     /// @param _claimContract ClaimContract address
     /// @param _erc721Template EventContract721 template address
     /// @param _erc1155Template EventContract1155 template address
-    /// @param _createEventFee Fee for creating events (wei)
-    /// @param _platformFeeBps Platform fee basis points (500 = 5%)
     constructor(
         address _admin,
         address _multisig,
         address _platformSigner,
         address _claimContract,
         address _erc721Template,
-        address _erc1155Template,
-        uint256 _createEventFee,
-        uint256 _platformFeeBps
+        address _erc1155Template
     ) {
+        if (_admin == address(0)) revert InvalidAddress();
+        if (_multisig == address(0)) revert InvalidAddress();
+        if (_platformSigner == address(0)) revert InvalidAddress();
+        if (_claimContract == address(0)) revert InvalidAddress();
+
         admin = _admin;
         multisig = _multisig;
         platformSigner = _platformSigner;
         claimContract = _claimContract;
+
+        if (_erc721Template == address(0)) revert InvalidTemplate();
+        if (_erc1155Template == address(0)) revert InvalidTemplate();
         erc721Template = _erc721Template;
         erc1155Template = _erc1155Template;
-        createEventFee = _createEventFee;
-        platformFeeBps = _platformFeeBps;
     }
 
     // =========================================================================
-    // EVENT CREATION — Crypto payment
+    // EVENT CREATION — Platform signer calls after GembaPay payment confirmation
     // =========================================================================
 
-    /// @notice Create a new event. Clones the appropriate template.
-    ///         Organizer pays creation fee in native token.
+    /// @notice Create a new event. Called by platform signer after GembaPay
+    ///         confirms the creation fee payment (crypto or fiat).
     /// @param _eventType 0 = ERC721, 1 = ERC1155
     /// @param _eventName Event name
     /// @param _baseURI IPFS metadata base URI
     /// @param _maxSupply Maximum total tickets
-    /// @param _priceInNative Ticket price (for ERC721; ignored for ERC1155)
+    /// @param _organizer Organizer address (receives revenue via GembaPay)
+    /// @param _paymentHash GembaPay payment ID hash (on-chain proof of payment)
     function createEvent(
         uint256 _eventType,
         string calldata _eventName,
         string calldata _baseURI,
         uint256 _maxSupply,
-        uint256 _priceInNative
-    ) external payable nonReentrant returns (address eventAddress) {
-        if (isPaused) revert Paused();
-        if (msg.value < createEventFee) revert InsufficientFee();
-
-        eventAddress = _deployEvent(
-            _eventType,
-            _eventName,
-            _baseURI,
-            _maxSupply,
-            _priceInNative,
-            msg.sender
-        );
-
-        emit EventCreated(eventAddress, msg.sender, _eventType, _eventName);
-    }
-
-    // =========================================================================
-    // EVENT CREATION — Fiat payment (platform signer calls after GembaPay)
-    // =========================================================================
-
-    /// @notice Create event after fiat payment confirmed by GembaPay webhook.
-    ///         Gas paid by platform signer.
-    /// @param _eventType 0 = ERC721, 1 = ERC1155
-    /// @param _eventName Event name
-    /// @param _baseURI IPFS metadata base URI
-    /// @param _maxSupply Maximum total tickets
-    /// @param _priceInNative Ticket price
-    /// @param _organizer Organizer address
-    /// @param _paymentHash GembaPay payment ID hash
-    function createEventWithFiatProof(
-        uint256 _eventType,
-        string calldata _eventName,
-        string calldata _baseURI,
-        uint256 _maxSupply,
-        uint256 _priceInNative,
         address _organizer,
         bytes32 _paymentHash
     ) external onlySigner nonReentrant returns (address eventAddress) {
         if (isPaused) revert Paused();
+        if (_organizer == address(0)) revert InvalidAddress();
 
         eventAddress = _deployEvent(
             _eventType,
             _eventName,
             _baseURI,
             _maxSupply,
-            _priceInNative,
             _organizer
         );
 
-        emit EventCreatedWithFiat(eventAddress, _organizer, _paymentHash);
+        emit EventCreated(eventAddress, _organizer, _eventType, _eventName, _paymentHash);
     }
 
     // =========================================================================
@@ -194,7 +154,6 @@ contract PlatformRegistry is ReentrancyGuard {
         string calldata _eventName,
         string calldata _baseURI,
         uint256 _maxSupply,
-        uint256 _priceInNative,
         address _organizer
     ) internal returns (address eventAddress) {
         // Deterministic salt for predictable addresses
@@ -204,72 +163,50 @@ contract PlatformRegistry is ReentrancyGuard {
             block.timestamp
         ));
 
-        // Clone the appropriate template
+        // Step 1: Clone template (CREATE2 — not an external call)
         if (_eventType == 0) {
             if (erc721Template == address(0)) revert InvalidTemplate();
             eventAddress = Clones.cloneDeterministic(erc721Template, salt);
-
-            // Initialize ERC721 event
-            (bool success,) = eventAddress.call(
-                abi.encodeWithSignature(
-                    "initialize(string,string,uint256,uint256,uint256,address,address,address,address)",
-                    _eventName,
-                    _baseURI,
-                    _maxSupply,
-                    _priceInNative,
-                    platformFeeBps,
-                    _organizer,
-                    platformSigner,
-                    address(this),  // treasury = this contract
-                    claimContract
-                )
-            );
-            if (!success) revert EventCreationFailed();
-
         } else if (_eventType == 1) {
             if (erc1155Template == address(0)) revert InvalidTemplate();
             eventAddress = Clones.cloneDeterministic(erc1155Template, salt);
-
-            // Initialize ERC1155 event
-            (bool success,) = eventAddress.call(
-                abi.encodeWithSignature(
-                    "initialize(string,string,uint256,uint256,address,address,address,address)",
-                    _eventName,
-                    _baseURI,
-                    _maxSupply,
-                    platformFeeBps,
-                    _organizer,
-                    platformSigner,
-                    address(this),
-                    claimContract
-                )
-            );
-            if (!success) revert EventCreationFailed();
-
         } else {
             revert InvalidEventType();
         }
 
-        // Register in ClaimContract
-        IClaimContract(claimContract).registerEvent(eventAddress);
-
-        // Track
+        // Step 2: State writes BEFORE any external calls (CEI pattern)
         allEvents.push(eventAddress);
         isEvent[eventAddress] = true;
         eventOrganizer[eventAddress] = _organizer;
+
+        // Step 3: Initialize clone (external call)
+        (bool success,) = eventAddress.call(
+            abi.encodeWithSignature(
+                "initialize(string,string,uint256,address,address,address)",
+                _eventName,
+                _baseURI,
+                _maxSupply,
+                _organizer,
+                platformSigner,
+                claimContract
+            )
+        );
+        if (!success) revert EventCreationFailed();
+
+        // Step 4: Register in ClaimContract (external call last)
+        IClaimContract(claimContract).registerEvent(eventAddress);
     }
 
     // =========================================================================
-    // TREASURY — Receives platform fees from event contracts
+    // TREASURY — For gas funding operations
     // =========================================================================
 
+    /// @notice Receive funds (for gas wallet funding).
     receive() external payable {
         emit FundsReceived(msg.sender, msg.value);
     }
 
-    /// @notice Withdraw funds from treasury. Multisig only.
-    /// @param _to Recipient address
-    /// @param _amount Amount in wei
+    /// @notice Withdraw funds from contract. Multisig only.
     function withdraw(address _to, uint256 _amount) external onlyMultisig nonReentrant {
         if (_to == address(0)) revert InvalidAddress();
 
@@ -280,7 +217,6 @@ contract PlatformRegistry is ReentrancyGuard {
     }
 
     /// @notice Fund the platform signer wallet for gas payments.
-    /// @param _amount Amount in wei
     function fundSigner(uint256 _amount) external onlyMultisig nonReentrant {
         (bool sent,) = platformSigner.call{value: _amount}("");
         if (!sent) revert FundingFailed();
@@ -293,9 +229,7 @@ contract PlatformRegistry is ReentrancyGuard {
     // =========================================================================
 
     /// @notice Update ERC721 or ERC1155 template address.
-    ///         New events will use the new template. Old events are unaffected.
-    /// @param _eventType 0 = ERC721, 1 = ERC1155
-    /// @param _newTemplate Address of the new template contract
+    ///         New events use new template. Old events unaffected (immutable).
     function setTemplate(uint256 _eventType, address _newTemplate) external onlyAdmin {
         if (_newTemplate == address(0)) revert InvalidTemplate();
 
@@ -310,16 +244,6 @@ contract PlatformRegistry is ReentrancyGuard {
         } else {
             revert InvalidEventType();
         }
-    }
-
-    function setCreateEventFee(uint256 _newFee) external onlyAdmin {
-        createEventFee = _newFee;
-        emit CreateFeeUpdated(_newFee);
-    }
-
-    function setPlatformFeeBps(uint256 _newFeeBps) external onlyAdmin {
-        platformFeeBps = _newFeeBps;
-        emit PlatformFeeUpdated(_newFeeBps);
     }
 
     function setPlatformSigner(address _newSigner) external onlyAdmin {
@@ -337,11 +261,13 @@ contract PlatformRegistry is ReentrancyGuard {
     function setMultisig(address _newMultisig) external onlyMultisig {
         if (_newMultisig == address(0)) revert InvalidAddress();
         multisig = _newMultisig;
+        emit MultisigUpdated(_newMultisig);
     }
 
     function setAdmin(address _newAdmin) external onlyAdmin {
         if (_newAdmin == address(0)) revert InvalidAddress();
         admin = _newAdmin;
+        emit AdminUpdated(_newAdmin);
     }
 
     function togglePause() external onlyAdmin {
@@ -372,7 +298,6 @@ contract PlatformRegistry is ReentrancyGuard {
         }
     }
 
-    /// @notice Predict the address of an event before creation.
     function predictEventAddress(
         uint256 _eventType,
         address _organizer
@@ -386,7 +311,7 @@ contract PlatformRegistry is ReentrancyGuard {
         return Clones.predictDeterministicAddress(template, salt);
     }
 
-    function treasuryBalance() external view returns (uint256) {
+    function contractBalance() external view returns (uint256) {
         return address(this).balance;
     }
 
@@ -405,7 +330,7 @@ contract PlatformRegistry is ReentrancyGuard {
     }
 
     modifier onlySigner() {
-        if (msg.sender != platformSigner) revert NotAdmin();
+        if (msg.sender != platformSigner) revert NotSigner();
         _;
     }
 }
