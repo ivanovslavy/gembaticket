@@ -1,1 +1,0 @@
-// ClaimContract unit tests (Hardhat)

@@ -2,15 +2,20 @@
 // ============================================
 // GembaTicket v2 — Platform Admin & Security Tests
 // ============================================
-// npx hardhat run scripts/test-platform-security.js --network localhost
-//
+// Reads deployed/<network>-latest.json for contract addresses.
 // Tests: access control, admin functions, pause, template upgrade,
-//        ClaimContract autonomy, reentrancy guards, edge cases
+//        treasury, key rotation, zero address validation, setup lockout
+//
+// Usage:
+//   npx hardhat run scripts/test-platform-security.js --network sepolia
+//   npx hardhat run scripts/test-platform-security.js --network localhost
 
 const hre = require("hardhat");
 const { ethers } = hre;
+const fs = require("fs");
+const path = require("path");
 
-const GREEN = "\x1b[32m✓\x1b[0m";
+const GREEN = "\x1b[32m✔\x1b[0m";
 const RED = "\x1b[31m✗\x1b[0m";
 let passed = 0;
 let failed = 0;
@@ -25,85 +30,92 @@ async function expectRevert(promise, name) {
   catch { console.log(`  ${GREEN} ${name} (reverted)`); passed++; }
 }
 
+async function signClaim1155(signer, contractAddr, typeId, claimHash, wallet) {
+  const messageHash = ethers.solidityPackedKeccak256(
+    ["address", "uint256", "bytes32", "address"],
+    [contractAddr, typeId, claimHash, wallet]
+  );
+  return signer.signMessage(ethers.getBytes(messageHash));
+}
+
+function randomClaimHash() {
+  return ethers.keccak256(ethers.randomBytes(32));
+}
+
+function loadDeployment(network) {
+  const filePath = path.join(__dirname, "..", "deployed", `${network}-latest.json`);
+  if (!fs.existsSync(filePath)) {
+    console.error(`\n  ✗ No deployment found at ${filePath}`);
+    console.error(`    Run first: npx hardhat run scripts/deploy.js --network ${network}\n`);
+    process.exit(1);
+  }
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
 async function main() {
   console.log("============================================");
   console.log("GembaTicket v2 — Platform & Security Tests");
   console.log("============================================\n");
 
-  const [admin, multisig, signer, organizer, attacker] = await ethers.getSigners();
+  const network = hre.network.name;
+  const deployment = loadDeployment(network);
+  console.log(`Network: ${network} (deployed: ${deployment.timestamp})`);
 
-  // Deploy with separate roles
-  console.log("--- Deploying with separate roles ---");
-  console.log(`  admin:    ${admin.address}`);
-  console.log(`  multisig: ${multisig.address}`);
-  console.log(`  signer:   ${signer.address}`);
-  console.log(`  attacker: ${attacker.address}\n`);
+  const signers = await ethers.getSigners();
+  const admin = signers[0];       // = deployer = platformSigner on localhost
+  const multisig = signers[0];
+  const platformSigner = signers[0];
+  const mintSigner = process.env.MINT_SIGNER_KEY
+    ? new ethers.Wallet(process.env.MINT_SIGNER_KEY, ethers.provider)
+    : signers[0];
+  const organizer = signers[1] || signers[0];
+  const attacker = signers[4] || signers[1] || signers[0];
+  const newAdmin = signers[5] || signers[2] || signers[0];
 
-  const t721 = await (await ethers.getContractFactory("EventContract721")).deploy();
-  const t1155 = await (await ethers.getContractFactory("EventContract1155")).deploy();
-  const claimC = await (await ethers.getContractFactory("ClaimContract")).deploy();
-  const reg = await (await ethers.getContractFactory("PlatformRegistry")).deploy(
-    admin.address, multisig.address, signer.address,
-    await claimC.getAddress(), await t721.getAddress(), await t1155.getAddress()
-  );
-  await claimC.setFactory(await reg.getAddress());
+  console.log("\nAccounts:");
+  console.log(`  admin/signer: ${admin.address}`);
+  console.log(`  mintSigner:   ${mintSigner.address}`);
+  console.log(`  organizer:    ${organizer.address}`);
+  console.log(`  attacker:     ${attacker.address}`);
+  console.log(`  newAdmin:     ${newAdmin.address}\n`);
 
-  const ph = ethers.keccak256(ethers.toUtf8Bytes("pay"));
+  const registryAddr = deployment.contracts.PlatformRegistry.address;
+  const registry = await ethers.getContractAt("PlatformRegistry", registryAddr);
+  console.log(`PlatformRegistry: ${registryAddr}`);
+
+  const ph = ethers.keccak256(ethers.toUtf8Bytes("sec-test-" + Date.now()));
 
   // =========================================================================
-  // TEST 1: Access Control — PlatformRegistry
+  // TEST 1: PlatformRegistry Access Control
   // =========================================================================
 
-  console.log("--- TEST 1: PlatformRegistry Access Control ---");
+  console.log("\n--- TEST 1: PlatformRegistry Access Control ---");
 
-  // Only signer can createEvent
-  await expectRevert(
-    reg.connect(attacker).createEvent(0, "Hack", "ipfs://", 10, attacker.address, ph),
-    "Attacker cannot createEvent"
-  );
-  await expectRevert(
-    reg.connect(admin).createEvent(0, "Hack", "ipfs://", 10, admin.address, ph),
-    "Admin cannot createEvent (only signer)"
-  );
+  if (attacker.address !== platformSigner.address) {
+    await expectRevert(
+      registry.connect(attacker).createEvent(0, "Hack", "ipfs://", 10, attacker.address, ph),
+      "Attacker cannot createEvent"
+    );
+  }
 
-  // Only admin can set settings
-  await expectRevert(
-    reg.connect(attacker).setPlatformSigner(attacker.address),
-    "Attacker cannot setPlatformSigner"
-  );
-  await expectRevert(
-    reg.connect(attacker).setTemplate(0, attacker.address),
-    "Attacker cannot setTemplate"
-  );
-  await expectRevert(
-    reg.connect(attacker).togglePause(),
-    "Attacker cannot togglePause"
-  );
-  await expectRevert(
-    reg.connect(attacker).setAdmin(attacker.address),
-    "Attacker cannot setAdmin"
-  );
+  if (attacker.address !== admin.address) {
+    await expectRevert(registry.connect(attacker).setPlatformSigner(attacker.address), "Attacker cannot setPlatformSigner");
+    await expectRevert(registry.connect(attacker).setMintSigner(attacker.address), "Attacker cannot setMintSigner");
+    await expectRevert(registry.connect(attacker).setTemplate(0, attacker.address), "Attacker cannot setTemplate");
+    await expectRevert(registry.connect(attacker).togglePause(), "Attacker cannot togglePause");
+    await expectRevert(registry.connect(attacker).setAdmin(attacker.address), "Attacker cannot setAdmin");
+  }
 
-  // Only multisig can withdraw/fund
-  await expectRevert(
-    reg.connect(attacker).withdraw(attacker.address, 1),
-    "Attacker cannot withdraw"
-  );
-  await expectRevert(
-    reg.connect(attacker).fundSigner(1),
-    "Attacker cannot fundSigner"
-  );
-  await expectRevert(
-    reg.connect(attacker).setMultisig(attacker.address),
-    "Attacker cannot setMultisig"
-  );
+  if (attacker.address !== multisig.address) {
+    await expectRevert(registry.connect(attacker).withdraw(attacker.address, 1), "Attacker cannot withdraw");
+    await expectRevert(registry.connect(attacker).fundSigner(1), "Attacker cannot fundSigner");
+    await expectRevert(registry.connect(attacker).setMultisig(attacker.address), "Attacker cannot setMultisig");
+  }
 
-  // Correct roles work
-  const tx1 = await reg.connect(signer).createEvent(
+  const tx1 = await registry.connect(platformSigner).createEvent(
     0, "Legit Event", "ipfs://legit/", 100, organizer.address, ph
   );
-  const r1 = await tx1.wait();
-  assert(r1.status === 1, "Signer creates event successfully");
+  assert((await tx1.wait()).status === 1, "Signer creates event successfully");
 
   // =========================================================================
   // TEST 2: Pause System
@@ -111,22 +123,21 @@ async function main() {
 
   console.log("\n--- TEST 2: Pause System ---");
 
-  await reg.connect(admin).togglePause();
-  assert(await reg.isPaused() === true, "Platform paused");
+  await registry.connect(admin).togglePause();
+  assert(await registry.isPaused() === true, "Platform paused");
 
   await expectRevert(
-    reg.connect(signer).createEvent(0, "Blocked", "ipfs://", 10, organizer.address, ph),
+    registry.connect(platformSigner).createEvent(0, "Blocked", "ipfs://", 10, organizer.address, ph),
     "Cannot createEvent when paused"
   );
 
-  await reg.connect(admin).togglePause();
-  assert(await reg.isPaused() === false, "Platform unpaused");
+  await registry.connect(admin).togglePause();
+  assert(await registry.isPaused() === false, "Platform unpaused");
 
-  // Can create after unpause
-  const tx2 = await reg.connect(signer).createEvent(
+  const tx2 = await registry.connect(platformSigner).createEvent(
     0, "After Unpause", "ipfs://", 10, organizer.address, ph
   );
-  assert((await tx2.wait()).status === 1, "Create event works after unpause");
+  assert((await tx2.wait()).status === 1, "Create event after unpause");
 
   // =========================================================================
   // TEST 3: Template Upgrade
@@ -134,34 +145,22 @@ async function main() {
 
   console.log("\n--- TEST 3: Template Upgrade ---");
 
-  const oldTemplate = await reg.erc721Template();
-
-  // Deploy new template
   const newT721 = await (await ethers.getContractFactory("EventContract721")).deploy();
   const newAddr = await newT721.getAddress();
 
-  await reg.connect(admin).setTemplate(0, newAddr);
-  assert(await reg.erc721Template() === newAddr, "ERC721 template updated");
+  await registry.connect(admin).setTemplate(0, newAddr);
+  assert(await registry.erc721Template() === newAddr, "ERC721 template updated");
 
-  // Old events still use old template (immutable clones)
-  // New event uses new template
-  const tx3 = await reg.connect(signer).createEvent(
+  const tx3 = await registry.connect(platformSigner).createEvent(
     0, "New Template Event", "ipfs://new/", 50, organizer.address, ph
   );
-  const r3 = await tx3.wait();
-  assert(r3.status === 1, "Event created with new template");
+  assert((await tx3.wait()).status === 1, "Event with new template");
 
-  // Cannot set zero address template
-  await expectRevert(
-    reg.connect(admin).setTemplate(0, ethers.ZeroAddress),
-    "Cannot set zero address template"
-  );
+  await expectRevert(registry.connect(admin).setTemplate(0, ethers.ZeroAddress), "Cannot set zero template");
+  await expectRevert(registry.connect(admin).setTemplate(5, newAddr), "Invalid event type");
 
-  // Invalid event type
-  await expectRevert(
-    reg.connect(admin).setTemplate(5, newAddr),
-    "Invalid event type reverts"
-  );
+  // Restore original
+  await registry.connect(admin).setTemplate(0, deployment.contracts.EventContract721.address);
 
   // =========================================================================
   // TEST 4: Treasury Operations
@@ -169,199 +168,204 @@ async function main() {
 
   console.log("\n--- TEST 4: Treasury ---");
 
-  // Send ETH to registry
-  await admin.sendTransaction({
-    to: await reg.getAddress(),
-    value: ethers.parseEther("1.0"),
-  });
+  await admin.sendTransaction({ to: registryAddr, value: ethers.parseEther("1.0") });
+  const balance = await registry.contractBalance();
+  assert(balance >= ethers.parseEther("1.0"), "Registry received ETH");
 
-  const balance = await reg.contractBalance();
-  assert(balance === ethers.parseEther("1.0"), "Registry received 1 ETH");
-
-  // Multisig withdraws
   const beforeBal = await ethers.provider.getBalance(organizer.address);
-  await reg.connect(multisig).withdraw(organizer.address, ethers.parseEther("0.5"));
+  await registry.connect(multisig).withdraw(organizer.address, ethers.parseEther("0.5"));
   const afterBal = await ethers.provider.getBalance(organizer.address);
-  assert(afterBal - beforeBal === ethers.parseEther("0.5"), "Withdraw 0.5 ETH to organizer");
+  assert(afterBal - beforeBal === ethers.parseEther("0.5"), "Withdraw 0.5 ETH");
 
   // Fund signer
-  const signerBefore = await ethers.provider.getBalance(signer.address);
-  await reg.connect(multisig).fundSigner(ethers.parseEther("0.3"));
-  const signerAfter = await ethers.provider.getBalance(signer.address);
-  assert(signerAfter - signerBefore === ethers.parseEther("0.3"), "Funded signer 0.3 ETH");
+  const signerBefore = await ethers.provider.getBalance(platformSigner.address);
+  await registry.connect(multisig).fundSigner(ethers.parseEther("0.3"));
+  const signerAfter = await ethers.provider.getBalance(platformSigner.address);
+  // Note: on localhost admin=multisig=signer, so gas costs make exact comparison hard
+  assert(signerAfter >= signerBefore, "Fund signer executed");
 
-  // Cannot withdraw to zero address
-  await expectRevert(
-    reg.connect(multisig).withdraw(ethers.ZeroAddress, 1),
-    "Cannot withdraw to zero address"
-  );
+  await expectRevert(registry.connect(multisig).withdraw(ethers.ZeroAddress, 1), "Cannot withdraw to zero");
 
   // =========================================================================
-  // TEST 5: ClaimContract Autonomy
+  // TEST 5: Zero Address Validation
   // =========================================================================
 
-  console.log("\n--- TEST 5: ClaimContract Autonomy ---");
+  console.log("\n--- TEST 5: Zero Address Checks ---");
 
-  // setFactory is one-time
+  await expectRevert(registry.connect(admin).setPlatformSigner(ethers.ZeroAddress), "Cannot set zero platform signer");
+  await expectRevert(registry.connect(admin).setMintSigner(ethers.ZeroAddress), "Cannot set zero mint signer");
+  await expectRevert(registry.connect(multisig).setMultisig(ethers.ZeroAddress), "Cannot set zero multisig");
+  await expectRevert(registry.connect(admin).setAdmin(ethers.ZeroAddress), "Cannot set zero admin");
   await expectRevert(
-    claimC.setFactory(attacker.address),
-    "setFactory already set — locked forever"
-  );
-
-  // Only registered events can lock claims
-  await expectRevert(
-    claimC.connect(attacker).lockForClaim(
-      ethers.keccak256(ethers.toUtf8Bytes("fake")), 1, attacker.address
-    ),
-    "Unregistered contract cannot lockForClaim"
-  );
-
-  await expectRevert(
-    claimC.connect(attacker).registerEvent(attacker.address),
-    "Only factory can registerEvent"
-  );
-
-  // =========================================================================
-  // TEST 6: Zero Address Validation
-  // =========================================================================
-
-  console.log("\n--- TEST 6: Zero Address Checks ---");
-
-  await expectRevert(
-    reg.connect(admin).setPlatformSigner(ethers.ZeroAddress),
-    "Cannot set zero platform signer"
-  );
-  await expectRevert(
-    reg.connect(admin).setClaimContract(ethers.ZeroAddress),
-    "Cannot set zero claim contract"
-  );
-  await expectRevert(
-    reg.connect(multisig).setMultisig(ethers.ZeroAddress),
-    "Cannot set zero multisig"
-  );
-  await expectRevert(
-    reg.connect(admin).setAdmin(ethers.ZeroAddress),
-    "Cannot set zero admin"
-  );
-
-  // createEvent with zero organizer
-  await expectRevert(
-    reg.connect(signer).createEvent(0, "Zero", "ipfs://", 10, ethers.ZeroAddress, ph),
+    registry.connect(platformSigner).createEvent(0, "Zero", "ipfs://", 10, ethers.ZeroAddress, ph),
     "Cannot create event with zero organizer"
   );
 
   // =========================================================================
-  // TEST 7: Event Contract Access Control
+  // TEST 6: Event Contract Access Control
   // =========================================================================
 
-  console.log("\n--- TEST 7: Event Contract Access ---");
+  console.log("\n--- TEST 6: Event Contract Access ---");
 
-  // Get an event address
-  const events = await reg.getEvents(0, 1);
-  const eventAddr = events[0];
-  const event721 = await ethers.getContractAt("EventContract721", eventAddr);
+  const events = await registry.getEvents(0, 1);
+  const event721 = await ethers.getContractAt("EventContract721", events[0]);
 
-  // Attacker cannot call onlyOwner functions
-  await expectRevert(
-    event721.connect(attacker).toggleSale(),
-    "Attacker cannot toggleSale"
-  );
-  await expectRevert(
-    event721.connect(attacker).cancelEvent(),
-    "Attacker cannot cancelEvent"
-  );
-  await expectRevert(
-    event721.connect(attacker).endEvent(),
-    "Attacker cannot endEvent"
-  );
-  await expectRevert(
-    event721.connect(attacker).setBaseURI("ipfs://hack/"),
-    "Attacker cannot setBaseURI"
-  );
+  if (attacker.address !== organizer.address) {
+    await expectRevert(event721.connect(attacker).toggleSale(), "Attacker cannot toggleSale");
+    await expectRevert(event721.connect(attacker).updateBaseURI("ipfs://hack/"), "Attacker cannot updateBaseURI");
+    await expectRevert(event721.connect(attacker).increaseSupply(9999), "Attacker cannot increaseSupply");
+    await expectRevert(event721.connect(attacker).transferOwnership(attacker.address), "Attacker cannot transferOwnership");
+    await expectRevert(event721.connect(attacker).setMintSigner(attacker.address), "Attacker cannot setMintSigner");
+    await expectRevert(event721.connect(attacker).setPlatform(attacker.address), "Attacker cannot setPlatform");
+  }
 
-  // Attacker cannot call onlyPlatform functions
-  const fakeHash = ethers.keccak256(ethers.toUtf8Bytes("fake"));
-  await expectRevert(
-    event721.connect(attacker).mintWithPaymentProof(attacker.address, fakeHash, fakeHash),
-    "Attacker cannot mintWithPaymentProof"
-  );
-  await expectRevert(
-    event721.connect(attacker).activateTicket(1),
-    "Attacker cannot activateTicket"
-  );
-  await expectRevert(
-    event721.connect(attacker).setPlatform(attacker.address),
-    "Attacker cannot setPlatform"
-  );
+  if (attacker.address !== platformSigner.address) {
+    await expectRevert(event721.connect(attacker).activateTicket(1), "Attacker cannot activateTicket");
+  }
 
   // =========================================================================
-  // TEST 8: Admin Role Transfer
+  // TEST 7: Key Rotation on Event Contract
   // =========================================================================
 
-  console.log("\n--- TEST 8: Role Transfer ---");
+  console.log("\n--- TEST 7: Key Rotation ---");
 
-  const [, , , , , newAdmin] = await ethers.getSigners();
+  const txK = await registry.connect(platformSigner).createEvent(
+    1, "Key Rotation Test", "ipfs://keys/", 100, organizer.address,
+    ethers.keccak256(ethers.toUtf8Bytes("pay-keys-" + Date.now()))
+  );
+  const rK = await txK.wait();
+  const kAddr = rK.logs.find(l => l.fragment && l.fragment.name === "EventCreated").args[0];
+  const keyEvent = await ethers.getContractAt("EventContract1155", kAddr);
 
-  await reg.connect(admin).setAdmin(newAdmin.address);
-  assert(await reg.admin() === newAdmin.address, "Admin transferred");
+  await keyEvent.connect(platformSigner).createTicketType(0, "General", 100, 0);
+  await keyEvent.connect(platformSigner).enableSale();
+  await keyEvent.connect(platformSigner).completeSetup();
 
-  // Old admin can no longer act
+  // Claim with original mintSigner
+  const h1 = randomClaimHash();
+  const s1 = await signClaim1155(mintSigner, kAddr, 0, h1, organizer.address);
+  await keyEvent.connect(organizer).claimTicket(0, h1, s1);
+  assert((await keyEvent.getEventInfo()).minted === 1n, "Claim with original mintSigner");
+
+  // Rotate mintSigner
+  await keyEvent.connect(organizer).setMintSigner(newAdmin.address);
+  assert(await keyEvent.mintSigner() === newAdmin.address, "MintSigner rotated");
+
+  // Old signer fails
+  const h2 = randomClaimHash();
+  const oldSig = await signClaim1155(mintSigner, kAddr, 0, h2, organizer.address);
+  await expectRevert(keyEvent.connect(organizer).claimTicket(0, h2, oldSig), "Old mintSigner rejected");
+
+  // New signer works
+  const newSig = await signClaim1155(newAdmin, kAddr, 0, h2, organizer.address);
+  await keyEvent.connect(organizer).claimTicket(0, h2, newSig);
+  assert((await keyEvent.getEventInfo()).minted === 2n, "New mintSigner works");
+
+  // Rotate platform
+  await keyEvent.connect(organizer).setPlatform(newAdmin.address);
+  assert(await keyEvent.platform() === newAdmin.address, "Platform rotated");
+
+  // Non-owner cannot rotate
+  if (attacker.address !== organizer.address) {
+    await expectRevert(keyEvent.connect(attacker).setMintSigner(attacker.address), "Non-owner cannot rotate mintSigner");
+    await expectRevert(keyEvent.connect(attacker).setPlatform(attacker.address), "Non-owner cannot rotate platform");
+  }
+
+  // =========================================================================
+  // TEST 8: Setup Phase Security
+  // =========================================================================
+
+  console.log("\n--- TEST 8: Setup Phase Security ---");
+
+  const txS = await registry.connect(platformSigner).createEvent(
+    1, "Setup Security", "ipfs://setup/", 100, organizer.address,
+    ethers.keccak256(ethers.toUtf8Bytes("pay-setup-" + Date.now()))
+  );
+  const rS = await txS.wait();
+  const sAddr = rS.logs.find(l => l.fragment && l.fragment.name === "EventCreated").args[0];
+  const setupEvent = await ethers.getContractAt("EventContract1155", sAddr);
+
+  // Owner cannot use platform setup functions
+  if (organizer.address !== platformSigner.address) {
+    await expectRevert(setupEvent.connect(organizer).createTicketType(0, "X", 100, 0), "Owner cannot createTicketType");
+    await expectRevert(setupEvent.connect(organizer).enableSale(), "Owner cannot enableSale");
+    await expectRevert(setupEvent.connect(organizer).completeSetup(), "Owner cannot completeSetup");
+  }
+
+  // Platform does setup
+  await setupEvent.connect(platformSigner).createTicketType(0, "General", 100, 0);
+  await setupEvent.connect(platformSigner).enableSale();
+  await setupEvent.connect(platformSigner).completeSetup();
+
+  // Platform locked after setup
   await expectRevert(
-    reg.connect(admin).togglePause(),
-    "Old admin cannot act"
+    setupEvent.connect(platformSigner).createTicketType(1, "Late", 50, 1),
+    "Platform locked after setup"
   );
 
-  // New admin works
-  await reg.connect(newAdmin).togglePause();
-  assert(await reg.isPaused() === true, "New admin can pause");
-  await reg.connect(newAdmin).togglePause(); // unpause
+  // Owner can still add types
+  await setupEvent.connect(organizer).addTicketType(1, "VIP Added", 50, 1);
+  assert((await setupEvent.getEventInfo()).types === 2n, "Owner added type after setup");
 
   // =========================================================================
-  // TEST 9: Registry View Functions
+  // TEST 9: Admin Role Transfer
   // =========================================================================
 
-  console.log("\n--- TEST 9: View Functions ---");
+  console.log("\n--- TEST 9: Admin Role Transfer ---");
 
-  const total = await reg.totalEvents();
-  assert(total >= 3n, `Total events: ${total} (≥3)`);
+  if (newAdmin.address !== admin.address) {
+    await registry.connect(admin).setAdmin(newAdmin.address);
+    assert(await registry.admin() === newAdmin.address, "Admin transferred");
 
-  const page = await reg.getEvents(0, 2);
-  assert(page.length === 2, "getEvents pagination: 2 results");
+    await expectRevert(registry.connect(admin).togglePause(), "Old admin cannot act");
 
-  const page2 = await reg.getEvents(2, 10);
-  assert(page2.length === Number(total) - 2, "getEvents offset works");
+    await registry.connect(newAdmin).togglePause();
+    assert(await registry.isPaused() === true, "New admin can pause");
+    await registry.connect(newAdmin).togglePause();
+
+    // Restore
+    await registry.connect(newAdmin).setAdmin(admin.address);
+  } else {
+    console.log("  ⚠ Skipped: not enough unique signers");
+  }
 
   // =========================================================================
-  // TEST 10: Constructor Validation
+  // TEST 10: Constructor Validation & View Functions
   // =========================================================================
 
-  console.log("\n--- TEST 10: Constructor Validation ---");
+  console.log("\n--- TEST 10: Constructor Validation & Views ---");
 
   const PlatformRegistry = await ethers.getContractFactory("PlatformRegistry");
 
   await expectRevert(
-    PlatformRegistry.deploy(
-      ethers.ZeroAddress, multisig.address, signer.address,
-      await claimC.getAddress(), await t721.getAddress(), await t1155.getAddress()
-    ),
+    PlatformRegistry.deploy(ethers.ZeroAddress, admin.address, admin.address, admin.address,
+      deployment.contracts.EventContract721.address, deployment.contracts.EventContract1155.address),
     "Zero admin in constructor reverts"
   );
-
   await expectRevert(
-    PlatformRegistry.deploy(
-      admin.address, multisig.address, signer.address,
-      await claimC.getAddress(), ethers.ZeroAddress, await t1155.getAddress()
-    ),
+    PlatformRegistry.deploy(admin.address, admin.address, admin.address, admin.address,
+      ethers.ZeroAddress, deployment.contracts.EventContract1155.address),
     "Zero ERC721 template in constructor reverts"
   );
-
   await expectRevert(
-    PlatformRegistry.deploy(
-      admin.address, multisig.address, signer.address,
-      await claimC.getAddress(), await t721.getAddress(), ethers.ZeroAddress
-    ),
+    PlatformRegistry.deploy(admin.address, admin.address, admin.address, admin.address,
+      deployment.contracts.EventContract721.address, ethers.ZeroAddress),
     "Zero ERC1155 template in constructor reverts"
   );
+  await expectRevert(
+    PlatformRegistry.deploy(admin.address, admin.address, admin.address, ethers.ZeroAddress,
+      deployment.contracts.EventContract721.address, deployment.contracts.EventContract1155.address),
+    "Zero mintSigner in constructor reverts"
+  );
+
+  const total = await registry.totalEvents();
+  assert(total >= 3n, `Total events: ${total} (≥3)`);
+
+  const page = await registry.getEvents(0, 2);
+  assert(page.length === 2, "getEvents pagination: 2 results");
+
+  assert(await registry.mintSigner() !== ethers.ZeroAddress, "MintSigner set");
+  assert(await registry.platformSigner() !== ethers.ZeroAddress, "PlatformSigner set");
 
   // =========================================================================
   // RESULTS

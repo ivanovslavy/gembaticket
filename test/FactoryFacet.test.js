@@ -1,1 +1,0 @@
-// FactoryFacet integration tests (Hardhat)
