@@ -39,6 +39,11 @@ Tickets don't hit the chain until the buyer clicks *Claim*. The API signs an EIP
 ### Scanner
 Bcrypt `apiKeyHash` for hot-path auth, plus AES-256-GCM `(apiKeyEnc, apiKeyNonce)` for dashboard re-reveal, plus `apiKeyPrefix` (first 8 chars, indexed) to narrow bcrypt candidates to ≤5 rows. Master key is `SCANNER_KEY_SECRET` — 32-byte hex.
 
+Platform admins can additionally provision **master scanner keys** (`ScannerDevice.isMaster = true`, `organizerId = null`, `eventId = null`) that validate tickets for any event. They are one-reveal-only — no decrypt path — and live alongside organizer-scoped keys on the same table. See [`ADMIN_DASHBOARD.md`](./ADMIN_DASHBOARD.md#access--keys-access).
+
+### Admin allowlist
+Admin access to `admin.gembaticket.com` is gated by the `AdminWallet` table, not by an environment variable. `requireAdminAuth` re-checks the row on every request, so revoking an admin is effectively instant. A single master wallet is flagged `isMaster = true`, cannot be removed, and is re-seeded on every API boot (`seedAdminWallets()` in `server.js`). The `ADMIN_WALLETS` env var is only consulted on first boot. See [`ADMIN_DASHBOARD.md`](./ADMIN_DASHBOARD.md#auth-model).
+
 ### RPC resilience (`FallbackJsonRpcProvider`)
 Public Sepolia RPCs rate-limit aggressively (600 req/60s on `publicnode.com`), so a single `new ethers.JsonRpcProvider(url)` would burn 75-second internal retry loops on every 429 and deadlock the API under normal dashboard polling. Instead, `src/config/blockchain.js` constructs a pool-based provider from `src/config/rpcEndpoints.js` — public endpoints first, then keyed providers (Infura, Alchemy, Ankr x5, QuickNode, Moralis) — and rotates through them on transient failures.
 
@@ -50,12 +55,24 @@ Public Sepolia RPCs rate-limit aggressively (600 req/60s on `publicnode.com`), s
 
 The listener (`gembaticket-listener`) and chain worker share the same provider — any `getBlockNumber`, `queryFilter`, `estimateGas`, `getFeeData`, `waitForTransaction`, or `broadcastTransaction` call transparently fails over.
 
+**Retry-after parsing.** Some providers (drpc.org, specifically) respond to bursts with a JSON-RPC error `code: -32090` whose message carries a Go-formatted duration — `"rate limit exceeded, retry in 10m0s"`. The provider parses that duration and marks the endpoint unhealthy for the exact window rather than using the default 30s cool-off, so a one-minute burst doesn't cause ten minutes of pointless retries.
+
+### Listener hardening (`eventListener.js`)
+
+The block-watcher worker is resumable via a `BlockSync` table (one row per contract — `platformRegistry` plus one row per `event_<address>`). Several guards keep it from degenerate behaviour:
+
+- **Scan window clamped.** A newly-registered `EventCreated` contract has no `BlockSync` row, so the naïve default of "start from block 0" would try to scan ~10.7M Sepolia blocks in a single poll. The listener seeds `BlockSync` with the registration block when it processes `EventCreated`, and also clamps any single poll window to `MAX_CATCHUP_BLOCKS = 5000`. A contract that somehow lost its row catches up over several polls instead of locking the worker for minutes.
+- **Block range 500.** `MAX_BLOCK_RANGE = 500` for `queryFilter`. Most public RPCs cap at 1000; 500 stays safely inside that envelope while still being 50× the old value.
+- **Polling mutex.** Polls are serialised with an in-process mutex, so a slow poll can't overlap with the next scheduled one. A `skipped` log is emitted if the next tick fires while the previous poll is still running.
+- **Single `getBlockNumber` per poll.** Fetched once at the top of the tick and passed down to every per-contract scan — avoids N+1 RPC hits when dozens of event contracts are tracked.
+- **Timing logs.** Every poll logs its duration; polls over 5 seconds log at a higher level so they show up in the monitoring tail.
+
 ### Rate limits
 Per-IP limits on auth/OTP/ticket endpoints, per-scanner on `/validate`. See [`API.md`](./API.md#rate-limits).
 
 ## Data model highlights
 
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md#prisma-schema-highlights). Core tables: `Organizer`, `Event`, `TicketType`, `Ticket`, `ChainAction`, `ChainJob`, `ScannerDevice`, `Zone`, `ScanLog`, `WebhookLog`, `BlockSync`.
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md#prisma-schema-highlights). Core tables: `Organizer`, `Event`, `TicketType`, `Ticket`, `ChainAction`, `ChainJob`, `ScannerDevice`, `Zone`, `ScanLog`, `WebhookLog`, `BlockSync`, `AdminWallet`.
 
 ## Security posture
 

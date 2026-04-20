@@ -92,6 +92,7 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 gembaticket.com/
 ├── README.md                 project overview (this file)
 ├── docs/
+│   ├── ADMIN_DASHBOARD.md    platform-admin panel (access + master keys)
 │   ├── ARCHITECTURE.md       system architecture + request paths
 │   ├── API.md                REST endpoints
 │   ├── BACKEND.md            Node API + worker overview (source private)
