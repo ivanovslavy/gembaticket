@@ -42,8 +42,10 @@ Ghost-wallet emails (`/^0x[0-9a-f]+@wallet\.gembaticket\.com$/i`) skip OTP-at-lo
 |---|---|---|---|
 | POST | `/buy` | JWT optional | Body: `{ eventId, ticketTypeId, quantity, email?, otpToken? }`. `otpToken` required iff no JWT. Returns `{ paymentUrl, ticketId }`. |
 | GET  | `/:id` | public | Public ticket view (rotating QR). |
-| GET  | `/mine` | JWT | Current user's tickets. |
-| POST | `/:id/claim` | JWT | Claim NFT to the connected wallet (lazy mint with EIP-712 signature). |
+| GET  | `/my` | JWT | Current user's tickets. |
+| GET  | `/event/:eventId` | JWT | Organizer view — tickets for their event. |
+
+NFT claim is a dedicated namespace — see `/api/claim` below. There is no `POST /tickets/:id/claim`.
 
 ## Dashboard — events (`/api/dashboard/events`)
 
@@ -94,10 +96,15 @@ Supported `fn` values: `increaseSupply`, `increaseTypeSupply`, `addTicketType`, 
 
 ## Claim (`/api/claim`)
 
+The claim flow is three endpoints. The buyer's wallet submits `claimTicket(...)` directly to the event contract — the backend only *signs* the EIP-712 message, it never pays gas. Once the SPA sees `isConfirmed`, it POSTs `/confirm` so the UI flips to "claimed" without waiting for the block listener.
+
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET  | `/:claimHash` | public | Reveal event + ticket metadata for a sharable claim URL. |
-| POST | `/:claimHash/activate` | public | Convert a PAID ticket to ACTIVATED (attended). |
+| POST | `/sign` | JWT | Body: `{ ticketId, walletAddress }`. Returns `{ signature, claimHash, contractAddress, eventType, typeId }`. Validates ticket ownership, event state, and that the NFT is not already claimed, then returns an EIP-712 signature for the buyer wallet to submit on-chain. |
+| POST | `/confirm` | public | Body: `{ ticketId, txHash }`. Reads the transaction receipt, parses the `TicketClaimed` log matching the ticket's `claimHash`, and marks `nftClaimed=true / tokenId / claimedWallet / claimedAt` in the DB. Idempotent — if already claimed, returns the current state. Returns `409` if the tx is not yet confirmed. |
+| GET  | `/status/:ticketId` | public | Returns `{ ticketId, nftClaimed, claimedWallet, tokenId, claimedAt, contractAddress }`. |
+
+The on-chain `eventListener` worker also watches `TicketClaimed` and writes the same row — `/confirm` is the *fast path*, the listener is the *fallback* for cases where the SPA tab is closed before the receipt arrives.
 
 ## Webhooks (`/webhooks`)
 

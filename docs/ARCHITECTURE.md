@@ -120,6 +120,17 @@ Each event contract is an **EIP-1167 minimal-proxy clone** of a UUPS-upgradeable
 
 See [`CHAIN_ACTIONS.md`](./CHAIN_ACTIONS.md). Full flow: estimate → GembaPay → webhook → ChainJob → receipt → (sync DB + email) or (refund + email).
 
+### Storefront — NFT claim (two-path finalization)
+
+The buyer's wallet submits `claimTicket(...)` directly to the event contract — the platform only *signs* the EIP-712 message. Finality is resolved by whichever of two writers lands first:
+
+1. `POST /api/claim/sign { ticketId, walletAddress }` → EIP-712 signature, bound to `(contractAddress, typeId?, claimHash, walletAddress)`. The backend does **not** broadcast.
+2. Wallet submits `claimTicket(...)` on-chain. The SPA uses `wagmi.useWaitForTransactionReceipt` to observe confirmation.
+3. **Fast path** — on `isConfirmed`, the SPA `POST /api/claim/confirm { ticketId, txHash }`. The API fetches the receipt via the `FallbackJsonRpcProvider` pool, parses the `TicketClaimed` log that matches `ticket.claimHash`, and writes `nftClaimed=true / tokenId / claimedWallet / claimedAt`. Idempotent.
+4. **Fallback path** — the `eventListener` worker is already subscribed to `TicketClaimed` and will write the same row if step 3 never runs (e.g. buyer closes the tab before the tx confirms, or the RPC pool is rate-limited at that instant).
+
+This is why a ticket can flip to "claimed" in seconds even under heavy Sepolia RPC load — the SPA's receipt call rotates through 15 endpoints via `FallbackJsonRpcProvider` (public nodes first, keyed endpoints as last resort), and the listener independently catches up later.
+
 ### Scanner — validate at the gate
 
 1. Scanner app sends `Authorization: Bearer <scanner-JWT>` (or `X-Scanner-Key: <plain apiKey>`).
@@ -137,6 +148,10 @@ Served from the storefront public root (Vite `/public`):
 - JSON-LD (`Organization`, `WebSite`, `SoftwareApplication`) injected via `react-helmet-async`
 - Open Graph + Twitter Cards on every public page
 - Canonical URLs via helmet
+
+## RPC fallback pool
+
+All read/write calls to Sepolia flow through `backend/src/utils/fallbackProvider.js` — a `FallbackJsonRpcProvider` that wraps 15 endpoints (`backend/src/config/rpcEndpoints.js`). Public nodes (publicnode, drpc, 1rpc, blastapi, omniatech, Ankr) are tried first so keyed endpoints (Infura, Alchemy, QuickNode, Moralis, Ankr-keyed) don't burn their quota; on a transient error (`429`, `5xx`, `-32090 retry-after`, missing-response / timeout) the provider rotates to the next endpoint and honours the advertised cooldown. Contract reverts bubble up unchanged. Pools for ETH mainnet, BSC, and Polygon are pre-wired.
 
 ## Observability
 
