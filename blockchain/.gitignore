@@ -28,6 +28,9 @@ mythril-*.txt
 mythril.config.json
 slither.config.json
 
+# Historical Sepolia deployments (only keep latest + the active snapshot)
+deployed/sepolia-2026-02-*.json
+
 # Internal scripts (not republished)
 scripts/GembaTicketV2.test.js
 scripts/check-balance.js
