@@ -18,8 +18,7 @@ coverage/
 coverage.json
 .ipfs/
 
-# Solidity source is kept in a private repository — audits + scripts only
-contracts/
+# Tests + scanner mocks stay private; contracts/ is published
 test/
 scanner/
 
@@ -42,6 +41,6 @@ scripts/test-erc1155-lifecycle.js
 scripts/test-erc721-lifecycle.js
 scripts/test-platform-security.js
 
-# Zero-byte corruption files
-P*
+# Zero-byte corruption files (scope to blockchain/ root only — don't catch contracts/PlatformRegistry.sol)
+/P*
 setup_structure.sh

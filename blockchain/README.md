@@ -10,15 +10,16 @@ Audit-grade Solidity layer for **GembaTicket v3**. Non-custodial event ticketing
 
 This directory contains the **public** artifacts of the smart-contract layer:
 
+- `contracts/` — Solidity source (MIT-licensed): `PlatformRegistry.sol`, `EventContract721.sol`, `EventContract1155.sol`, plus `interfaces/`.
 - `docs/audit_solidity.md` — formal audit report (Slither, Mythril, functional assertions).
 - `docs/nft-ticket-platform-v2-plan*.md` — design documents kept for historical reference.
 - `reports/` — raw Slither JSON outputs.
-- `slither-report.txt`, `mythril-*.txt`, `*.config.json` — analyzer outputs and configs.
+- `slither-report.txt` and `*.config.json` — analyzer outputs and configs.
 - `deployed/` — Sepolia deployment addresses (public on-chain record).
-- `scripts/` — deployment, verification, and integration-test scripts.
+- `scripts/` — deployment and verification scripts.
 - `hardhat.config.js`, `package.json` — project scaffolding.
 
-The Solidity **source** itself is maintained in a private repository. A clean-room reviewer can reproduce every audit result from the binaries + reports in this folder.
+Tests (`test/`) and internal Hardhat scripts remain private. A clean-room reviewer can reproduce every audit result from `contracts/` + `hardhat.config.js` + `package.json`.
 
 ---
 

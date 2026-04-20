@@ -2,7 +2,7 @@
 
 **Non-custodial, NFT-powered event ticketing.** Organizers create events on a familiar dashboard, buyers pay with card or crypto via GembaPay, and every ticket is backed by an ERC-721 or ERC-1155 on Ethereum. Rotating QRs at the gate, auditable on-chain history for organizers, and a payment-gated workflow where the platform signs on the organizer's behalf so no Web3 knowledge is required.
 
-> This repository is the **public home for GembaTicket's documentation, smart-contract audits, and deployment artifacts**. Application source code (backend, frontend, scanner, Solidity) is maintained privately.
+> This repository is the **public home for GembaTicket's documentation, smart-contract source + audits, and deployment artifacts**. Backend, frontend, and scanner application source are maintained privately.
 
 [![Chain](https://img.shields.io/badge/chain-Ethereum%20Sepolia-627eea)]()
 [![Standards](https://img.shields.io/badge/standards-ERC--721%20%7C%20ERC--1155-4F46E5)]()
@@ -114,7 +114,7 @@ gembaticket.com/
 └── .gitignore                excludes all application source
 ```
 
-Application source code (`backend/`, `frontend/`, `scanner/`, `blockchain/contracts/`) is intentionally **not published**. This repository exists so reviewers, auditors, and AI agents can understand how the platform is wired without access to the code.
+Application source code (`backend/`, `frontend/`, `scanner/`) is intentionally **not published**. This repository exists so reviewers, auditors, and AI agents can understand how the platform is wired without access to the application code. Smart-contract source under `blockchain/contracts/` **is** published — licensed MIT, audited, and reproducible.
 
 ## Live deployment
 

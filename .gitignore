@@ -1,9 +1,9 @@
 # =========================================================================
 # GembaTicket public repository .gitignore
 #
-# This repo publishes DOCUMENTATION, SMART-CONTRACT AUDITS, and DEPLOYMENT
-# ARTIFACTS only. Application source code (backend, frontends, scanner,
-# Solidity) is maintained privately and must NEVER be committed here.
+# This repo publishes DOCUMENTATION, SMART-CONTRACT SOURCE + AUDITS, and
+# DEPLOYMENT ARTIFACTS. Application source (backend, frontends, scanner)
+# is maintained privately and must NEVER be committed here.
 # =========================================================================
 
 # -------- Private source trees (entire folders) --------
@@ -11,8 +11,7 @@ backend/
 frontend/
 scanner/
 
-# -------- Blockchain folder: keep docs/scripts/audits, exclude source --------
-blockchain/contracts/
+# -------- Blockchain folder: keep contracts/docs/scripts/audits, exclude build output --------
 blockchain/artifacts/
 blockchain/cache/
 blockchain/test/
