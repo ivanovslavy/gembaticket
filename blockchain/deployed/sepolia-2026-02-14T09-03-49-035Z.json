@@ -1,0 +1,32 @@
+{
+  "version": "2.0",
+  "network": "sepolia",
+  "chainId": 11155111,
+  "timestamp": "2026-02-14T09:03:49.035Z",
+  "deployer": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+  "contracts": {
+    "EventContract721": {
+      "address": "0xE4d6B58D8eD436FcA93F46F33325a19dBB6872c3",
+      "type": "template (EIP-1167)",
+      "tx": "0x8a64bb4cad018bcce57eacc9fba002b8b1f68467ba4dc7346813382e8cedf610"
+    },
+    "EventContract1155": {
+      "address": "0x25a91B3199C6C4aD787F9d51CB5fE838D4ef66D1",
+      "type": "template (EIP-1167)",
+      "tx": "0x2a90faf1f969070ee0566ae73cbc73940f26dfebaccb6e7af2d574a25e2f2011"
+    },
+    "PlatformRegistry": {
+      "address": "0x448F53a1e3213f9fEF57f8663ed4DeF6D83fe0d9",
+      "type": "singleton",
+      "tx": "0xbcd548ba441e4b334ba58e4526bd645ec2f43253c387e9f95477b3849a81d887"
+    }
+  },
+  "configuration": {
+    "admin": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "multisig": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "platformSigner": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "mintSigner": "0x3418196aBeC513A95dF013751bcE036C7b27fa5a",
+    "payments": "All payments via GembaPay (contracts are payment-agnostic)",
+    "architecture": "Signature-based claiming — no ClaimContract"
+  }
+}

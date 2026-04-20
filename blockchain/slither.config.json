@@ -1,0 +1,12 @@
+{
+  "detectors_to_run": "all",
+  "exclude_informational": false,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "filter_paths": "node_modules",
+  "solc_remaps": [
+    "@openzeppelin/=node_modules/@openzeppelin/"
+  ],
+  "solc_args": "--optimize --optimize-runs 200"
+}

@@ -1,0 +1,30 @@
+{
+  "version": "2.1",
+  "network": "sepolia",
+  "chainId": 11155111,
+  "timestamp": "2026-04-20T05:24:07.000Z",
+  "deployer": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+  "changes": "Added OPERATOR role (4-role model). Day-to-day ops (increaseSupply, toggleSale, toggleTicketType, addTicketType, setTypeURI/setTokenURI/updateBaseURI/setURI) now callable by owner OR operator. Operator defaults to platformSigner so non-web3 organizers can click buttons in dashboard; backend relays tx. Sovereign actions (transferOwnership, cancelEvent, endEvent, setPlatform, setMintSigner, setOperator) remain owner-only.",
+  "contracts": {
+    "EventContract721": {
+      "address": "0x2481644e460A77B072c28f209055A3e86764192F",
+      "type": "template (EIP-1167)"
+    },
+    "EventContract1155": {
+      "address": "0xEFd2000dBC5b5C897823eEFCcAA99d5DC2Ce7DBA",
+      "type": "template (EIP-1167)"
+    },
+    "PlatformRegistry": {
+      "address": "0xDdF1793B1A8632D4d94aAAc5f83bE058cb39c522",
+      "type": "singleton"
+    }
+  },
+  "configuration": {
+    "admin": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "multisig": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "platformSigner": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "mintSigner": "0x3418196aBeC513A95dF013751bcE036C7b27fa5a",
+    "payments": "All payments via GembaPay (contracts are payment-agnostic)",
+    "architecture": "Signature-based claiming — no ClaimContract"
+  }
+}

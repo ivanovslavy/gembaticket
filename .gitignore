@@ -1,0 +1,97 @@
+# =========================================================================
+# GembaTicket public repository .gitignore
+#
+# This repo publishes DOCUMENTATION, SMART-CONTRACT AUDITS, and DEPLOYMENT
+# ARTIFACTS only. Application source code (backend, frontends, scanner,
+# Solidity) is maintained privately and must NEVER be committed here.
+# =========================================================================
+
+# -------- Private source trees (entire folders) --------
+backend/
+frontend/
+scanner/
+
+# -------- Blockchain folder: keep docs/scripts/audits, exclude source --------
+blockchain/contracts/
+blockchain/artifacts/
+blockchain/cache/
+blockchain/test/
+blockchain/node_modules/
+blockchain/.env
+blockchain/coverage/
+blockchain/typechain/
+blockchain/typechain-types/
+blockchain/scanner/
+
+# Nested git repo inside blockchain/ — keep its history local, don't publish
+blockchain/.git/
+blockchain/.git.bak/
+
+# Zero-byte corruption files seen in blockchain/ on some builds
+blockchain/P*
+blockchain/setup_structure.sh
+
+# -------- Environment / secrets --------
+.env
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+
+# -------- AI assistant context — never publish --------
+CLAUDE.md
+.claude/
+
+# -------- Node / JS tooling --------
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.vite/
+.turbo/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# -------- Editor / OS --------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# -------- Archives & backups --------
+*.tar.gz
+*.zip
+*.bak
+*.backup
+backup_*/
+~*
+
+# -------- Runtime --------
+pids/
+*.pid
+*.seed
+uploads/

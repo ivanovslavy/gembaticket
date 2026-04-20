@@ -1,0 +1,100 @@
+'npx hardhat clean' running (wd: /home/slavy/gembaticket)
+'npx hardhat clean --global' running (wd: /home/slavy/gembaticket)
+Problem deserializing hardhat configuration, using defaults: Expecting value: line 1 column 2 (char 1)
+'npx hardhat compile --force' running (wd: /home/slavy/gembaticket)
+INFO:Detectors:
+Modifier EventContract1155.onlyOwnerOrPlatformOnce() (contracts/EventContract1155.sol#504-514) does not always execute _; or revert
+Modifier EventContract721.onlyOwnerOrPlatformOnce() (contracts/EventContract721.sol#392-402) does not always execute _; or revert
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-modifier
+INFO:Detectors:
+PlatformRegistry.getEvents(uint256,uint256) (contracts/PlatformRegistry.sol#266-278) uses timestamp for comparisons
+	Dangerous comparisons:
+	- end > allEvents.length (contracts/PlatformRegistry.sol#271)
+	- i < length (contracts/PlatformRegistry.sol#275)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+EventContract1155._recoverSigner(bytes32,bytes) (contracts/EventContract1155.sol#463-480) uses assembly
+	- INLINE ASM (contracts/EventContract1155.sol#470-474)
+EventContract721._recoverSigner(bytes32,bytes) (contracts/EventContract721.sol#353-370) uses assembly
+	- INLINE ASM (contracts/EventContract721.sol#360-364)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#assembly-usage
+INFO:Detectors:
+Low level call in PlatformRegistry._deployEvent(uint256,string,string,uint256,address) (contracts/PlatformRegistry.sol#143-187):
+	- (success,None) = eventAddress.call(abi.encodeWithSignature(initialize(string,string,uint256,address,address,address),_eventName,_baseURI,_maxSupply,_organizer,platformSigner,mintSigner)) (contracts/PlatformRegistry.sol#175-185)
+Low level call in PlatformRegistry.withdraw(address,uint256) (contracts/PlatformRegistry.sol#197-202):
+	- (sent,None) = _to.call{value: _amount}() (contracts/PlatformRegistry.sol#199)
+Low level call in PlatformRegistry.fundSigner(uint256) (contracts/PlatformRegistry.sol#204-208):
+	- (sent,None) = platformSigner.call{value: _amount}() (contracts/PlatformRegistry.sol#205)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+INFO:Detectors:
+Parameter EventContract1155.initialize(string,string,uint256,address,address,address)._eventName (contracts/EventContract1155.sol#135) is not in mixedCase
+Parameter EventContract1155.initialize(string,string,uint256,address,address,address)._uri (contracts/EventContract1155.sol#136) is not in mixedCase
+Parameter EventContract1155.initialize(string,string,uint256,address,address,address)._maxSupply (contracts/EventContract1155.sol#137) is not in mixedCase
+Parameter EventContract1155.initialize(string,string,uint256,address,address,address)._owner (contracts/EventContract1155.sol#138) is not in mixedCase
+Parameter EventContract1155.initialize(string,string,uint256,address,address,address)._platform (contracts/EventContract1155.sol#139) is not in mixedCase
+Parameter EventContract1155.initialize(string,string,uint256,address,address,address)._mintSigner (contracts/EventContract1155.sol#140) is not in mixedCase
+Parameter EventContract1155.createTicketType(uint256,string,uint256,uint256)._typeId (contracts/EventContract1155.sol#164) is not in mixedCase
+Parameter EventContract1155.createTicketType(uint256,string,uint256,uint256)._name (contracts/EventContract1155.sol#165) is not in mixedCase
+Parameter EventContract1155.createTicketType(uint256,string,uint256,uint256)._typeMaxSupply (contracts/EventContract1155.sol#166) is not in mixedCase
+Parameter EventContract1155.createTicketType(uint256,string,uint256,uint256)._zoneLevel (contracts/EventContract1155.sol#167) is not in mixedCase
+Parameter EventContract1155.setBaseURI(string)._newURI (contracts/EventContract1155.sol#191) is not in mixedCase
+Parameter EventContract1155.claimTicket(uint256,bytes32,bytes)._typeId (contracts/EventContract1155.sol#211) is not in mixedCase
+Parameter EventContract1155.claimTicket(uint256,bytes32,bytes)._claimHash (contracts/EventContract1155.sol#212) is not in mixedCase
+Parameter EventContract1155.claimTicket(uint256,bytes32,bytes)._signature (contracts/EventContract1155.sol#213) is not in mixedCase
+Parameter EventContract1155.activateTicket(uint256)._tokenId (contracts/EventContract1155.sol#251) is not in mixedCase
+Parameter EventContract1155.toggleTicketType(uint256)._typeId (contracts/EventContract1155.sol#291) is not in mixedCase
+Parameter EventContract1155.increaseTypeSupply(uint256,uint256)._typeId (contracts/EventContract1155.sol#298) is not in mixedCase
+Parameter EventContract1155.increaseTypeSupply(uint256,uint256)._additional (contracts/EventContract1155.sol#298) is not in mixedCase
+Parameter EventContract1155.addTicketType(uint256,string,uint256,uint256)._typeId (contracts/EventContract1155.sol#309) is not in mixedCase
+Parameter EventContract1155.addTicketType(uint256,string,uint256,uint256)._name (contracts/EventContract1155.sol#310) is not in mixedCase
+Parameter EventContract1155.addTicketType(uint256,string,uint256,uint256)._typeMaxSupply (contracts/EventContract1155.sol#311) is not in mixedCase
+Parameter EventContract1155.addTicketType(uint256,string,uint256,uint256)._zoneLevel (contracts/EventContract1155.sol#312) is not in mixedCase
+Parameter EventContract1155.setTypeURI(uint256,string)._typeId (contracts/EventContract1155.sol#330) is not in mixedCase
+Parameter EventContract1155.setTypeURI(uint256,string)._typeUri (contracts/EventContract1155.sol#330) is not in mixedCase
+Parameter EventContract1155.setURI(string)._newURI (contracts/EventContract1155.sol#336) is not in mixedCase
+Parameter EventContract1155.setPlatform(address)._new (contracts/EventContract1155.sol#364) is not in mixedCase
+Parameter EventContract1155.setMintSigner(address)._new (contracts/EventContract1155.sol#371) is not in mixedCase
+Parameter EventContract1155.transferOwnership(address)._newOwner (contracts/EventContract1155.sol#377) is not in mixedCase
+Parameter EventContract1155.uri(uint256)._id (contracts/EventContract1155.sol#388) is not in mixedCase
+Parameter EventContract1155.getTicketInfo(uint256)._tokenId (contracts/EventContract1155.sol#399) is not in mixedCase
+Parameter EventContract1155.getTicketTypeInfo(uint256)._typeId (contracts/EventContract1155.sol#416) is not in mixedCase
+Parameter EventContract721.initialize(string,string,uint256,address,address,address)._eventName (contracts/EventContract721.sol#106) is not in mixedCase
+Parameter EventContract721.initialize(string,string,uint256,address,address,address)._uri (contracts/EventContract721.sol#107) is not in mixedCase
+Parameter EventContract721.initialize(string,string,uint256,address,address,address)._maxSupply (contracts/EventContract721.sol#108) is not in mixedCase
+Parameter EventContract721.initialize(string,string,uint256,address,address,address)._owner (contracts/EventContract721.sol#109) is not in mixedCase
+Parameter EventContract721.initialize(string,string,uint256,address,address,address)._platform (contracts/EventContract721.sol#110) is not in mixedCase
+Parameter EventContract721.initialize(string,string,uint256,address,address,address)._mintSigner (contracts/EventContract721.sol#111) is not in mixedCase
+Parameter EventContract721.setBaseURI(string)._newBaseURI (contracts/EventContract721.sol#142) is not in mixedCase
+Parameter EventContract721.claimTicket(bytes32,bytes)._claimHash (contracts/EventContract721.sol#162) is not in mixedCase
+Parameter EventContract721.claimTicket(bytes32,bytes)._signature (contracts/EventContract721.sol#163) is not in mixedCase
+Parameter EventContract721.activateTicket(uint256)._tokenId (contracts/EventContract721.sol#195) is not in mixedCase
+Parameter EventContract721.increaseSupply(uint256)._additional (contracts/EventContract721.sol#234) is not in mixedCase
+Parameter EventContract721.setTokenURI(uint256,string)._tokenId (contracts/EventContract721.sol#240) is not in mixedCase
+Parameter EventContract721.setTokenURI(uint256,string)._uri (contracts/EventContract721.sol#240) is not in mixedCase
+Parameter EventContract721.updateBaseURI(string)._newBaseURI (contracts/EventContract721.sol#245) is not in mixedCase
+Parameter EventContract721.setPlatform(address)._new (contracts/EventContract721.sol#274) is not in mixedCase
+Parameter EventContract721.setMintSigner(address)._new (contracts/EventContract721.sol#281) is not in mixedCase
+Parameter EventContract721.transferOwnership(address)._newOwner (contracts/EventContract721.sol#287) is not in mixedCase
+Parameter EventContract721.tokenURI(uint256)._tokenId (contracts/EventContract721.sol#298) is not in mixedCase
+Parameter EventContract721.getTicketInfo(uint256)._tokenId (contracts/EventContract721.sol#313) is not in mixedCase
+Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._eventType (contracts/PlatformRegistry.sol#118) is not in mixedCase
+Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._eventName (contracts/PlatformRegistry.sol#119) is not in mixedCase
+Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._baseURI (contracts/PlatformRegistry.sol#120) is not in mixedCase
+Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._maxSupply (contracts/PlatformRegistry.sol#121) is not in mixedCase
+Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._organizer (contracts/PlatformRegistry.sol#122) is not in mixedCase
+Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._paymentHash (contracts/PlatformRegistry.sol#123) is not in mixedCase
+Parameter PlatformRegistry.withdraw(address,uint256)._to (contracts/PlatformRegistry.sol#197) is not in mixedCase
+Parameter PlatformRegistry.withdraw(address,uint256)._amount (contracts/PlatformRegistry.sol#197) is not in mixedCase
+Parameter PlatformRegistry.fundSigner(uint256)._amount (contracts/PlatformRegistry.sol#204) is not in mixedCase
+Parameter PlatformRegistry.setTemplate(uint256,address)._eventType (contracts/PlatformRegistry.sol#214) is not in mixedCase
+Parameter PlatformRegistry.setTemplate(uint256,address)._newTemplate (contracts/PlatformRegistry.sol#214) is not in mixedCase
+Parameter PlatformRegistry.setPlatformSigner(address)._newSigner (contracts/PlatformRegistry.sol#229) is not in mixedCase
+Parameter PlatformRegistry.setMintSigner(address)._newMintSigner (contracts/PlatformRegistry.sol#235) is not in mixedCase
+Parameter PlatformRegistry.setMultisig(address)._newMultisig (contracts/PlatformRegistry.sol#241) is not in mixedCase
+Parameter PlatformRegistry.setAdmin(address)._newAdmin (contracts/PlatformRegistry.sol#247) is not in mixedCase
+Parameter PlatformRegistry.getEvents(uint256,uint256)._offset (contracts/PlatformRegistry.sol#266) is not in mixedCase
+Parameter PlatformRegistry.getEvents(uint256,uint256)._limit (contracts/PlatformRegistry.sol#266) is not in mixedCase
+Parameter PlatformRegistry.predictEventAddress(uint256,address)._eventType (contracts/PlatformRegistry.sol#281) is not in mixedCase
+Parameter PlatformRegistry.predictEventAddress(uint256,address)._organizer (contracts/PlatformRegistry.sol#282) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+INFO:Slither:. analyzed (35 contracts with 100 detectors), 77 result(s) found
