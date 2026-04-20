@@ -7,7 +7,7 @@
 - **Node.js 20**, Express, Prisma.
 - **PostgreSQL 16** — primary store (organizers, events, tickets, chain actions, scanners, webhook log, block sync).
 - **Redis 7** on port 6380 — OTP codes, verification tokens, rate-limit counters.
-- **Ethers.js v6** — Sepolia RPC, EIP-712 signing, contract calls.
+- **Ethers.js v6** — EIP-712 signing, contract calls, and a custom `FallbackJsonRpcProvider` (see below).
 - **SMTP** — transactional email (organizer OTP, ticket delivery, chain-action notifications).
 - **GembaPay** — hosted checkout + HMAC-SHA256 webhook for deploy / ticket / action charges.
 
@@ -38,6 +38,17 @@ Tickets don't hit the chain until the buyer clicks *Claim*. The API signs an EIP
 
 ### Scanner
 Bcrypt `apiKeyHash` for hot-path auth, plus AES-256-GCM `(apiKeyEnc, apiKeyNonce)` for dashboard re-reveal, plus `apiKeyPrefix` (first 8 chars, indexed) to narrow bcrypt candidates to ≤5 rows. Master key is `SCANNER_KEY_SECRET` — 32-byte hex.
+
+### RPC resilience (`FallbackJsonRpcProvider`)
+Public Sepolia RPCs rate-limit aggressively (600 req/60s on `publicnode.com`), so a single `new ethers.JsonRpcProvider(url)` would burn 75-second internal retry loops on every 429 and deadlock the API under normal dashboard polling. Instead, `src/config/blockchain.js` constructs a pool-based provider from `src/config/rpcEndpoints.js` — public endpoints first, then keyed providers (Infura, Alchemy, Ankr x5, QuickNode, Moralis) — and rotates through them on transient failures.
+
+- **Transient → rotate**: HTTP 429, 5xx, timeouts, network errors (`ECONNRESET`, `ETIMEDOUT`, etc.).
+- **Permanent → surface**: contract reverts, `INSUFFICIENT_FUNDS`, `NONCE_EXPIRED`, `CALL_EXCEPTION`.
+- **Per-endpoint timeout**: 4s. Ethers' built-in retry loop is disabled (`retryFunc = () => false`) so the outer rotation drives backoff.
+- **Health tracking**: a failing endpoint is marked unhealthy for 30s and skipped on the first pass; three full rotations are attempted before the error surfaces.
+- **Chain support**: Sepolia (currently live), plus ready-to-use pools for Ethereum mainnet, BSC mainnet/testnet, and Polygon in `rpcEndpoints.js`.
+
+The listener (`gembaticket-listener`) and chain worker share the same provider — any `getBlockNumber`, `queryFilter`, `estimateGas`, `getFeeData`, `waitForTransaction`, or `broadcastTransaction` call transparently fails over.
 
 ### Rate limits
 Per-IP limits on auth/OTP/ticket endpoints, per-scanner on `/validate`. See [`API.md`](./API.md#rate-limits).

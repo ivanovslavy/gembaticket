@@ -121,6 +121,7 @@ sudo systemctl restart gembaticket-api gembaticket-chain-worker gembaticket-list
 - `DATABASE_URL`, `JWT_SECRET`
 - `REDIS_URL` (port 6380)
 - `ETHEREUM_RPC_URL`, `CHAIN_ID`, `REGISTRY_ADDRESS`, `ERC721_TEMPLATE`, `ERC1155_TEMPLATE`, `PLATFORM_SIGNER_KEY`, `MINT_SIGNER_KEY`
+- Fallback RPC pool (optional, appended after the public endpoints in `src/config/rpcEndpoints.js` — see [`BACKEND.md`](./BACKEND.md#rpc-resilience-fallbackjsonrpcprovider)): `INFURA_API_KEY`, `ALCHEMY_API_KEY`, `QUICKNODE_SEPOLIA_URL`, `ANKR_API_KEY_1`…`ANKR_API_KEY_5`, `MORALIS_API_KEY`, `GETBLOCK_BSC_TESTNET_URL`, `CHAINSTACK_BSC_MAINNET_URL`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_REPLY_TO`
 - `GEMBAPAY_API_URL`, `GEMBAPAY_API_KEY`, `GEMBAPAY_WEBHOOK_SECRET`
 - `SCANNER_KEY_SECRET` — 32-byte hex, reversible AES-256-GCM master key
