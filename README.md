@@ -94,32 +94,26 @@ gembaticket.com/
 ├── docs/
 │   ├── ARCHITECTURE.md       system architecture + request paths
 │   ├── API.md                REST endpoints
+│   ├── BACKEND.md            Node API + worker overview (source private)
 │   ├── CHAIN_ACTIONS.md      paid on-chain operations flow
 │   ├── DASHBOARD.md          organizer dashboard, end-to-end
 │   ├── DEPLOYMENT.md         Pi + systemd + Apache operations
-│   └── OTP_FLOW.md           email OTP (login + purchase)
-├── backend/
-│   └── README.md             service overview (source private)
-├── frontend/
-│   └── README.md             storefront + dashboard overview (source private)
-├── scanner/
-│   └── README.md             gate-staff PWA overview
+│   ├── FRONTEND.md           storefront / dashboard / admin overview
+│   ├── OTP_FLOW.md           email OTP (login + purchase)
+│   └── SCANNER.md            gate-staff PWA overview
 ├── blockchain/
-│   ├── README.md             smart-contract repo overview
+│   ├── README.md             smart-contract layer overview
 │   ├── hardhat.config.js     Hardhat configuration
 │   ├── package.json          devDependencies for reproducing builds
 │   ├── docs/                 audit report + platform plans
-│   ├── scripts/              deploy / verify / lifecycle test scripts
-│   ├── deployed/             chain addresses (Sepolia v2 + v3)
+│   ├── scripts/              deploy-v2.js, verify-deploy.js
+│   ├── deployed/             chain addresses (Sepolia)
 │   ├── reports/              Slither JSON reports
-│   ├── slither.config.json   Slither config
-│   ├── mythril.config.json   Mythril config
-│   ├── mythril-*.txt         Mythril runs (per contract)
-│   └── slither-report.txt    Slither run output
+│   └── slither-report.txt    consolidated Slither run output
 └── .gitignore                excludes all application source
 ```
 
-Application source code (`backend/src/`, `frontend/*/src/`, `scanner/src/`, `blockchain/contracts/*.sol`) is intentionally **not published**. This repository exists so reviewers, auditors, and AI agents can understand how the platform is wired without access to the code.
+Application source code (`backend/`, `frontend/`, `scanner/`, `blockchain/contracts/`) is intentionally **not published**. This repository exists so reviewers, auditors, and AI agents can understand how the platform is wired without access to the code.
 
 ## Live deployment
 
