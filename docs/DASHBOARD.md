@@ -10,10 +10,10 @@ This document describes every screen the organizer sees, in the order a first-ti
 
 ### Register
 
-`POST /api/auth/register { email, password, name, turnstileToken? }`
+`POST /api/auth/register { email, password, name, company?, wallet?, turnstileToken? }`
 
-- The server creates a `PENDING` organizer row and sends a 6-digit OTP to the email (Redis, 10-min TTL).
-- UI prompts for the code → `POST /api/auth/register-verify-otp { email, code }` → JWT.
+- Server validates inputs, checks email/wallet uniqueness, then emails a 6-digit OTP (Redis, 10-min TTL, 30s resend cooldown). **No DB row is written yet** — abandoned signups leave nothing behind.
+- UI prompts for the code → `POST /api/auth/register-verify-otp { email, password, name, company?, wallet?, phone?, code }` → re-runs uniqueness checks, creates the organizer with `verified=true`, returns `{ token, organizer }`.
 
 ### Log in
 

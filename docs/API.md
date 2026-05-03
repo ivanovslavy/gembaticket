@@ -13,8 +13,8 @@ Response convention: `200 OK { … }` on success, `4xx { error: string }` on cli
 
 | Method | Path | Body | Auth | Notes |
 |---|---|---|---|---|
-| POST | `/register` | `{ email, password, name, turnstileToken? }` | public | Returns `{ otpRequired: true }`. Follow with `/register-verify-otp`. |
-| POST | `/register-verify-otp` | `{ email, code }` | public | Returns `{ token, organizer }`. |
+| POST | `/register` | `{ email, password, name, company?, wallet?, turnstileToken? }` | public | Validates + emails OTP. Returns `{ otpRequired: true, email }`. No DB row written yet. |
+| POST | `/register-verify-otp` | `{ email, password, name, company?, wallet?, phone?, code }` | public | Verifies OTP, creates organizer with `verified=true`, returns `{ token, organizer }`. |
 | POST | `/login` | `{ email, password, turnstileToken? }` | public | Returns `{ token, organizer }` **or** `{ otpRequired: true }` if OTP-at-login is enabled (default). |
 | POST | `/login-verify-otp` | `{ email, password, code }` | public | Returns `{ token, organizer }`. |
 | POST | `/purchase-otp/send` | `{ email, eventId, ticketTypeId, quantity }` | public | Sends 6-digit code with event context (name, venue, date, type, qty). |
