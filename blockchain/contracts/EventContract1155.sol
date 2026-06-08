@@ -96,6 +96,11 @@ contract EventContract1155 is
 
     // --- Event metadata ---
     string  public eventName;
+
+    /// @notice Standard name()/symbol() so wallets & explorers display the event
+    /// name (ERC-1155 has none by default; the name is set at initialize -> eventName).
+    function name() external view returns (string memory) { return eventName; }
+    function symbol() external pure returns (string memory) { return "GTKT"; }
     uint256 public totalMinted;
     uint256 public maxSupply;   // Global cap across all types
 
