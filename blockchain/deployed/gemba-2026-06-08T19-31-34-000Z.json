@@ -1,0 +1,22 @@
+{
+  "version": "2.1",
+  "network": "gemba",
+  "chainId": 821207,
+  "timestamp": "2026-06-08T19:31:34.000Z",
+  "deployer": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+  "changes": "Migrated from Ethereum Sepolia to GembaBlockchain testnet (chainId 821207). Fresh deployment of EventContract721/1155 templates + PlatformRegistry on Gemba; verified on GembaScan. Backend/listener switched to chainId 821207 (RPC https://testnet.gembascan.io/rpc). Legacy Sepolia deployment retained as historical records (sepolia-latest.json).",
+  "contracts": {
+    "EventContract721": { "address": "0x95e75771B4e066A7edAD62d8d7CbDD50307c814e", "type": "template (EIP-1167)" },
+    "EventContract1155": { "address": "0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0", "type": "template (EIP-1167)" },
+    "PlatformRegistry": { "address": "0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191", "type": "singleton" }
+  },
+  "configuration": {
+    "admin": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "multisig": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "platformSigner": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "mintSigner": "0x3418196aBeC513A95dF013751bcE036C7b27fa5a",
+    "explorer": "https://testnet.gembascan.io",
+    "rpc": "https://testnet.gembascan.io/rpc",
+    "payments": "All payments via GembaPay (contracts are payment-agnostic)"
+  }
+}

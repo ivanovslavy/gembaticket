@@ -16,6 +16,12 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
     },
+    gemba: {
+      url: process.env.GEMBA_RPC_URL || "https://testnet.gembascan.io/rpc",
+      accounts: process.env.PLATFORM_SIGNER_KEY ? [process.env.PLATFORM_SIGNER_KEY] : [],
+      chainId: 821207,
+      timeout: 120000,
+    },
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || "",
       accounts: process.env.PLATFORM_SIGNER_KEY ? [process.env.PLATFORM_SIGNER_KEY] : [],
@@ -49,6 +55,7 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
+      gemba: "gembascan",
       sepolia: process.env.ETHERSCAN_API_KEY,
       mainnet: process.env.ETHERSCAN_API_KEY,
       polygon: process.env.POLYGONSCAN_API_KEY,
@@ -57,6 +64,14 @@ module.exports = {
       bscTestnet: process.env.BSCSCAN_API_KEY,
     },
     customChains: [
+      {
+        network: "gemba",
+        chainId: 821207,
+        urls: {
+          apiURL: "https://testnet.gembascan.io/api",
+          browserURL: "https://testnet.gembascan.io",
+        },
+      },
       {
         network: "sepolia",
         chainId: 11155111,

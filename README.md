@@ -4,7 +4,7 @@
 
 > This repository is the **public home for GembaTicket's documentation, smart-contract source + audits, and deployment artifacts**. Backend, frontend, and scanner application source are maintained privately.
 
-[![Chain](https://img.shields.io/badge/chain-Ethereum%20Sepolia-627eea)]()
+[![Chain](https://img.shields.io/badge/chain-GembaBlockchain%20Testnet-6366f1)]()
 [![Standards](https://img.shields.io/badge/standards-ERC--721%20%7C%20ERC--1155-4F46E5)]()
 [![Solidity](https://img.shields.io/badge/solidity-0.8.28-363636)]()
 [![OZ](https://img.shields.io/badge/OpenZeppelin-5.4-4E5EE4)]()
@@ -40,7 +40,7 @@ Event ticketing built for organizers who don't touch wallets, and for attendees 
                          ┌──────────────────┐        ┌────────────────┐
                          │ chain worker +   │───────▶│ EventContract  │
                          │ event listener   │        │ (ERC-721/1155) │
-                         └──────────────────┘        │ on Sepolia     │
+                         └──────────────────┘        │ on GembaChain  │
                                                      └────────────────┘
                                                               ▲
                     ┌──────────┐  rotating QR         ┌───────┴──────┐
@@ -108,7 +108,7 @@ gembaticket.com/
 │   ├── package.json          devDependencies for reproducing builds
 │   ├── docs/                 audit report + platform plans
 │   ├── scripts/              deploy-v2.js, verify-deploy.js
-│   ├── deployed/             chain addresses (Sepolia)
+│   ├── deployed/             chain addresses (GembaBlockchain + legacy Sepolia)
 │   ├── reports/              Slither JSON reports
 │   └── slither-report.txt    consolidated Slither run output
 └── .gitignore                excludes all application source
@@ -124,9 +124,9 @@ Application source code (`backend/`, `frontend/`, `scanner/`) is intentionally *
 | Dashboard | https://dashboard.gembaticket.com |
 | API | https://api.gembaticket.com |
 | Scanner PWA | https://scanner.gembaticket.com |
-| Chain | Ethereum Sepolia (chainId 11155111) |
+| Chain | GembaBlockchain testnet (chainId 821207) — migrated from Sepolia |
 
-Current contract addresses are in [`blockchain/deployed/sepolia-latest.json`](./blockchain/deployed/sepolia-latest.json).
+Current contract addresses are in [`blockchain/deployed/gemba-latest.json`](./blockchain/deployed/gemba-latest.json) (explorer: [GembaScan](https://testnet.gembascan.io)). Legacy Sepolia addresses kept in [`sepolia-latest.json`](./blockchain/deployed/sepolia-latest.json).
 
 ## For AI agents / research tools
 
