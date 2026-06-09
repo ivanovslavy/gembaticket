@@ -89,7 +89,7 @@ KPI strip + recent-activity list. Data comes from `GET /api/admin/monitoring` (s
 
 ### Revenue (`/revenue`)
 
-`GET /api/admin/revenue` — platform-fee earnings broken down by event and organizer over the last 30 days, plus a time-series for charting. Numbers are denominated in EUR (GembaPay's reporting currency), with optional ETH-equivalent for chain-action gas.
+`GET /api/admin/revenue` — platform-fee earnings broken down by event and organizer over the last 30 days, plus a time-series for charting. Numbers are denominated in EUR (GembaPay's reporting currency), with optional GMB-equivalent for chain-action gas.
 
 ### Organizers (`/organizers`, `/organizers/:id`)
 
@@ -167,7 +167,7 @@ The auth endpoints are rate-limited (`rl:admin-auth`, 20 req / 60s per IP) becau
 |---|---|---|
 | `GET` | `/api/admin/monitoring` | Service health snapshot. |
 | `GET` | `/api/admin/logs` | Tail recent pino logs (last 500). |
-| `GET` | `/api/admin/revenue` | Revenue breakdown (EUR + ETH). |
+| `GET` | `/api/admin/revenue` | Revenue breakdown (EUR + GMB). |
 | `GET` | `/api/admin/organizers` | Paginated organizer list (ghost-filtered). |
 | `GET` | `/api/admin/organizers/:id` | Organizer detail. |
 | `GET` | `/api/admin/events` | Paginated event list. |

@@ -51,7 +51,7 @@ Public GembaBlockchain RPCs rate-limit aggressively (600 req/60s on `publicnode.
 - **Permanent → surface**: contract reverts, `INSUFFICIENT_FUNDS`, `NONCE_EXPIRED`, `CALL_EXCEPTION`.
 - **Per-endpoint timeout**: 4s. Ethers' built-in retry loop is disabled (`retryFunc = () => false`) so the outer rotation drives backoff.
 - **Health tracking**: a failing endpoint is marked unhealthy for 30s and skipped on the first pass; three full rotations are attempted before the error surfaces.
-- **Chain support**: GembaBlockchain (currently live), plus ready-to-use pools for Ethereum mainnet, BSC mainnet/testnet, and Polygon in `rpcEndpoints.js`.
+- **Chain support**: **GembaBlockchain** — GembaTicket's own EVM-compatible Layer-1 with ~0 gas fees (testnet `821207` live, mainnet `821206` rolling out). RPC is a fallback pool over GembaBlockchain endpoints (`testnet.gembascan.io/rpc` plus `rpc1`/`rpc2.gembascan.io`) in `rpcEndpoints.js`. (The platform was originally planned for Polygon; it now runs on GembaBlockchain.)
 
 The listener (`gembaticket-listener`) and chain worker share the same provider — any `getBlockNumber`, `queryFilter`, `estimateGas`, `getFeeData`, `waitForTransaction`, or `broadcastTransaction` call transparently fails over.
 

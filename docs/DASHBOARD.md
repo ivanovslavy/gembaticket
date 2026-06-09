@@ -285,7 +285,7 @@ Two owner-only chain actions that the dashboard currently exposes only via a *Da
 - **End event** — `endEvent()`. Prevents further claims/activations. Leaves minted NFTs intact.
 - **Cancel event** — `cancelEvent()`. Marks the contract as cancelled; Prisma triggers automatic refunds for PAID tickets via GembaPay.
 
-These require an organizer wallet holding enough GembaBlockchain ETH to pay gas themselves. If the operator has already been revoked, every chain write falls into this category — the dashboard surfaces a banner explaining so.
+These require an organizer wallet holding enough GMB to pay gas themselves. If the operator has already been revoked, every chain write falls into this category — the dashboard surfaces a banner explaining so.
 
 ---
 

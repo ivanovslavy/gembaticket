@@ -118,7 +118,7 @@ This means an organizer whose transaction reverts due to a transient issue (RPC 
 
 - Gas estimation uses `contract[fn].estimateGas(...args, { from: signer.address })`.
 - Gas price comes from `provider.getFeeData().maxFeePerGas ?? gasPrice`.
-- ETH → EUR conversion via CoinGecko `simple/price?ids=ethereum&vs_currencies=eur`, cached in-process for 30s. Fallback rate `2800 EUR/ETH` if unreachable.
+- GMB → EUR conversion via CoinGecko `simple/price?ids=ethereum&vs_currencies=eur`, cached in-process for 30s. Fallback rate `2800 EUR/GMB` if unreachable.
 - The charged total is `Math.round((gasEur + 5) * 100) / 100`. GembaPay handles final currency conversion at settlement — the platform is not exposed to FX drift.
 
 ## Database + mirror sync
@@ -154,7 +154,7 @@ Each terminal state triggers one email to the organizer via `emailService.sendCh
 
 `OperatorPanel.jsx` in the dashboard wraps `setOperator` / `renounceOperator` in the same `ChainActionPaymentModal`, but the modal short-circuits payment because the backend marks those fns as `paid: false`. The user experience is identical ("Submit → waiting → confirmed") without a checkout step.
 
-Revoking the operator means the organizer must sign all future changes themselves from a wallet that holds GembaBlockchain ETH — the dashboard's paid-action buttons will start failing gas estimation with a meaningful revert reason.
+Revoking the operator means the organizer must sign all future changes themselves from a wallet that holds GMB — the dashboard's paid-action buttons will start failing gas estimation with a meaningful revert reason.
 
 ## Webhook dispatch
 

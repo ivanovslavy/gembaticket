@@ -151,7 +151,7 @@ Served from the storefront public root (Vite `/public`):
 
 ## RPC fallback pool
 
-All read/write calls to GembaBlockchain flow through `backend/src/utils/fallbackProvider.js` — a `FallbackJsonRpcProvider` that wraps 15 endpoints (`backend/src/config/rpcEndpoints.js`). Public nodes (publicnode, drpc, 1rpc, blastapi, omniatech, Ankr) are tried first so keyed endpoints (Infura, Alchemy, QuickNode, Moralis, Ankr-keyed) don't burn their quota; on a transient error (`429`, `5xx`, `-32090 retry-after`, missing-response / timeout) the provider rotates to the next endpoint and honours the advertised cooldown. Contract reverts bubble up unchanged. Pools for ETH mainnet, BSC, and Polygon are pre-wired.
+All read/write calls to GembaBlockchain flow through `backend/src/utils/fallbackProvider.js` — a `FallbackJsonRpcProvider` that wraps 15 endpoints (`backend/src/config/rpcEndpoints.js`). Public nodes (publicnode, drpc, 1rpc, blastapi, omniatech, Ankr) are tried first so keyed endpoints (Infura, Alchemy, QuickNode, Moralis, Ankr-keyed) don't burn their quota; on a transient error (`429`, `5xx`, `-32090 retry-after`, missing-response / timeout) the provider rotates to the next endpoint and honours the advertised cooldown. Contract reverts bubble up unchanged. The active pool targets **GembaBlockchain** RPC endpoints (`testnet.gembascan.io/rpc` plus `rpc1`/`rpc2.gembascan.io`) — GembaTicket's own EVM Layer-1 (the platform was originally planned for Polygon; it now runs on GembaBlockchain).
 
 ## Observability
 
