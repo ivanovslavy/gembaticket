@@ -154,7 +154,7 @@ Each terminal state triggers one email to the organizer via `emailService.sendCh
 
 `OperatorPanel.jsx` in the dashboard wraps `setOperator` / `renounceOperator` in the same `ChainActionPaymentModal`, but the modal short-circuits payment because the backend marks those fns as `paid: false`. The user experience is identical ("Submit → waiting → confirmed") without a checkout step.
 
-Revoking the operator means the organizer must sign all future changes themselves from a wallet that holds Sepolia ETH — the dashboard's paid-action buttons will start failing gas estimation with a meaningful revert reason.
+Revoking the operator means the organizer must sign all future changes themselves from a wallet that holds GembaBlockchain ETH — the dashboard's paid-action buttons will start failing gas estimation with a meaningful revert reason.
 
 ## Webhook dispatch
 

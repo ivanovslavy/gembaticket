@@ -172,7 +172,7 @@ The auth endpoints are rate-limited (`rl:admin-auth`, 20 req / 60s per IP) becau
 | `GET` | `/api/admin/organizers/:id` | Organizer detail. |
 | `GET` | `/api/admin/events` | Paginated event list. |
 | `GET` | `/api/admin/events/:id` | Event detail + chain history. |
-| `GET` | `/api/admin/operator-wallet` | Operator wallet balance + nonce (Sepolia). |
+| `GET` | `/api/admin/operator-wallet` | Operator wallet balance + nonce (GembaBlockchain). |
 | `GET` | `/api/admin/scanner-devices` | Cross-organizer scanner roll-up. |
 | `GET` | `/api/admin/webhooks` | Webhook log tail. |
 | `GET` | `/api/admin/chain-jobs` | Chain job queue. |

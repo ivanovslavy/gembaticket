@@ -4,6 +4,10 @@
 
 > **0 fees.** GembaTicket is a next-generation, blockchain-based platform that runs on **GembaBlockchain** and charges **no platform fees, no commissions, no hidden costs**. The only transaction costs come from the payment provider: GembaPay (standard **1%**), plus Stripe/PayPal's own fees on card/PayPal payments; web3-wallet payments incur only the GembaPay fee. See the [Terms](https://gembaticket.com/terms) and [Refund Policy](https://gembaticket.com/refund).
 
+> **GembaBlockchain — our own EVM-compatible Layer-1, with ~0 gas fees** (testnet now, mainnet soon). The blockchain is an **invisible layer**: the backend signs transactions when needed, so attendees and organizers **never deal with wallets, gas, or signing** — a modern, user-friendly experience.
+
+> **No account needed for attendees.** Buyers receive their ticket **directly by email** and open it from there **without creating an account**. Each ticket is a **multi-page NFT** — event poster image, on-chain event details (date, venue, ticket type), and an interactive QR page — optionally claimable to a self-custodial wallet.
+
 > This repository is the **public home for GembaTicket's documentation, smart-contract source + audits, and deployment artifacts**. Backend, frontend, and scanner application source are maintained privately.
 
 [![Chain](https://img.shields.io/badge/chain-GembaBlockchain-4F46E5)]()
@@ -69,6 +73,9 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - **GembaPay (with KYC) is the payment provider** — organizers register with GembaPay, complete KYC, and add their API key + webhook secret in settings before they can sell. Funds settle directly to the organizer (Stripe / PayPal / web3 wallet); **refunds are the organizer's responsibility** via GembaPay's refund dashboard.
 
 ### For attendees
+- **No account required** — your ticket is delivered **by email** and opens directly from there; signing up is optional.
+- **Multi-page NFT ticket** — event poster image + on-chain event details (date, venue, ticket type) + an interactive QR page.
+- **Invisible blockchain** — no wallet, gas, or signing; the platform handles all on-chain steps for you.
 - Card, crypto, PayPal (via GembaPay) — no wallet required.
 - OTP-verified email before purchase (anti-bot, anti-typo).
 - **Optional two-factor authentication** on the account (email code or authenticator app).
@@ -133,9 +140,21 @@ Application source code (`backend/`, `frontend/`, `scanner/`) is intentionally *
 | Dashboard | https://dashboard.gembaticket.com |
 | API | https://api.gembaticket.com |
 | Scanner PWA | https://scanner.gembaticket.com |
+| Explorer | https://testnet.gembascan.io (GembaScan) |
 | Chain | GembaBlockchain testnet (chainId 821207) — mainnet 821206 rolling out |
 
-Current contract addresses are in [`blockchain/deployed/sepolia-latest.json`](./blockchain/deployed/sepolia-latest.json).
+### Contracts (GembaBlockchain testnet, chainId 821207)
+
+Redeployed on GembaBlockchain. Current addresses are in [`blockchain/deployed/gemba-latest.json`](./blockchain/deployed/gemba-latest.json):
+
+| Contract | Address |
+|---|---|
+| PlatformRegistry | `0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191` |
+| EventContract721 (template) | `0x2481644e460A77B072c28f209055A3e86764192F` |
+| EventContract1155 (template) | `0xEFd2000dBC5b5C897823eEFCcAA99d5DC2Ce7DBA` |
+| Claim | `0x32c4EFa02D33d6aEb81fEC72d6C1a868edd7229e` |
+
+Per-event contracts are EIP-1167 minimal-proxy clones of the templates, deployed on demand (free).
 
 ## For AI agents / research tools
 

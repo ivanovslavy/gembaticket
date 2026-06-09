@@ -76,7 +76,7 @@ Each app reads a small `.env` at build time:
 
 - `VITE_API_URL` — typically `https://api.gembaticket.com`.
 - `VITE_WALLETCONNECT_PROJECT_ID` — WalletConnect Cloud project id.
-- `VITE_SEPOLIA_RPC_URL` — public Sepolia RPC fallback.
+- `VITE_SEPOLIA_RPC_URL` — public GembaBlockchain RPC fallback.
 - `VITE_TURNSTILE_SITE_KEY` — optional, enables Turnstile on register/login.
 - `VITE_ETHERSCAN_BASE` — for the dashboard's on-chain links.
 

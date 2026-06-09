@@ -1,32 +1,36 @@
 {
-  "version": "2.1",
-  "network": "gemba",
+  "version": "3.0",
+  "network": "gemba-testnet",
   "chainId": 821207,
-  "timestamp": "2026-06-08T19:31:34.000Z",
+  "rpc": "https://testnet.gembascan.io/rpc",
+  "explorer": "https://testnet.gembascan.io",
+  "timestamp": "2026-06-08T00:00:00.000Z",
   "deployer": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
-  "changes": "Migrated from Ethereum Sepolia to GembaBlockchain testnet (chainId 821207). Fresh deployment of EventContract721/1155 templates + PlatformRegistry on Gemba; verified on GembaScan. Backend/listener switched to chainId 821207 (RPC https://testnet.gembascan.io/rpc). Legacy Sepolia deployment retained as historical records (sepolia-latest.json).",
+  "changes": "Redeployed on GembaBlockchain — GembaTicket's own EVM-compatible Layer-1 with ~0 gas fees (testnet now, mainnet 821206 rolling out). Same 4-role operator model; the backend relays/signs transactions so non-web3 organizers and attendees never deal with wallets, gas, or signing (invisible blockchain). Per-event contracts are EIP-1167 minimal-proxy clones of the templates, deployed free on demand. Zero platform fees.",
   "contracts": {
+    "PlatformRegistry": {
+      "address": "0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191",
+      "type": "singleton"
+    },
     "EventContract721": {
-      "address": "0x95e75771B4e066A7edAD62d8d7CbDD50307c814e",
+      "address": "0x2481644e460A77B072c28f209055A3e86764192F",
       "type": "template (EIP-1167)"
     },
     "EventContract1155": {
-      "address": "0x1B4866f2B0d23fCA1964E622153ebcDDDAc34c4a",
-      "type": "template (EIP-1167)",
-      "note": "redeployed 2026-06-08 with name()/symbol() getters so wallets/explorers show the event name (ERC-1155 has none by default); registry.setTemplate(1) updated. Prior template 0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0."
+      "address": "0xEFd2000dBC5b5C897823eEFCcAA99d5DC2Ce7DBA",
+      "type": "template (EIP-1167)"
     },
-    "PlatformRegistry": {
-      "address": "0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191",
+    "Claim": {
+      "address": "0x32c4EFa02D33d6aEb81fEC72d6C1a868edd7229e",
       "type": "singleton"
     }
   },
   "configuration": {
     "admin": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
-    "multisig": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
     "platformSigner": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
     "mintSigner": "0x3418196aBeC513A95dF013751bcE036C7b27fa5a",
-    "explorer": "https://testnet.gembascan.io",
-    "rpc": "https://testnet.gembascan.io/rpc",
-    "payments": "All payments via GembaPay (contracts are payment-agnostic)"
+    "payments": "All payments via GembaPay (contracts are payment-agnostic); 0 platform fees",
+    "gas": "Negligible — GembaBlockchain native gas ~0; backend sponsors/relays so users never pay or sign",
+    "nft": "Multi-page NFT — poster image + on-chain event details (attributes) + interactive QR page (animation_url)"
   }
 }
