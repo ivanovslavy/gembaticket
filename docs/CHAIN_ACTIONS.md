@@ -1,6 +1,13 @@
-# Paid chain actions
+# Chain actions
 
-After an event is deployed, every change to its on-chain state (supply, sale toggle, ticket types, operator) flows through a single **paid chain action** pipeline. This document is the canonical reference for how that pipeline is wired.
+> **⚠️ Service fees are currently DISABLED — chain actions are FREE.** GembaTicket runs on
+> **GembaBlockchain**, where gas is negligible, and the platform charges **0 fees** (`FEES_ENABLED=false`).
+> Event deploys and all chain actions complete **gas-only, with no GembaPay charge**: the backend returns
+> `{ free: true }` / a `null` payment URL and proceeds directly. The fee/payment mechanics described below are
+> **retained, dormant, behind the `FEES_ENABLED` flag** — nothing was deleted. The only transaction fee on the
+> platform comes from GembaPay (standard 1%) on buyer payments, plus Stripe/PayPal's own fees on card/PayPal.
+
+After an event is deployed, every change to its on-chain state (supply, sale toggle, ticket types, operator) flows through a single **chain action** pipeline. This document is the canonical reference for how that pipeline is wired.
 
 ## Motivation
 
