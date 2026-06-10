@@ -94,3 +94,9 @@ pids/
 *.pid
 *.seed
 uploads/
+.env.*
+*mnemonic*
+keyring*
+claude.md
+progress.md
+PROGRESS.md
