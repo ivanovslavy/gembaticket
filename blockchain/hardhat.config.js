@@ -17,7 +17,7 @@ module.exports = {
       url: "http://127.0.0.1:8545",
     },
     gemba: {
-      url: process.env.GEMBA_RPC_URL || "https://testnet.gembascan.io/rpc",
+      url: process.env.GEMBA_RPC_URL || "https://rpc1.gembascan.io",
       accounts: process.env.PLATFORM_SIGNER_KEY ? [process.env.PLATFORM_SIGNER_KEY] : [],
       chainId: 821207,
       timeout: 120000,
