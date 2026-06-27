@@ -3,7 +3,7 @@
 // templates is safe — new events get the gasless claimTicketFor path on top.
 const hre = require("hardhat");
 
-const REGISTRY = "0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191";
+const REGISTRY = "0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02";
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
