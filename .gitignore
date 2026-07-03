@@ -100,3 +100,6 @@ keyring*
 claude.md
 progress.md
 PROGRESS.md
+
+# Security audit reports - sensitive, keep OUT of the repo (public)
+security-audit/
