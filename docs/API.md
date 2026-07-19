@@ -1,7 +1,7 @@
 # API Reference
 
 Base URL (prod): `https://api.gembaticket.com`
-Base URL (dev): `http://localhost:3080`
+Base URL (dev): `http://localhost:3100`
 
 Auth: `Authorization: Bearer <JWT>` unless noted "public". Scanner endpoints accept either a scanner-JWT or the plain `X-Scanner-Key: <apiKey>` header.
 

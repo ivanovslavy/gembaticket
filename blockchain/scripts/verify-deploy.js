@@ -1,9 +1,9 @@
 const hre = require("hardhat");
 
 async function main() {
-  const REG  = "0xDdF1793B1A8632D4d94aAAc5f83bE058cb39c522";
-  const T721 = "0x2481644e460A77B072c28f209055A3e86764192F";
-  const T1155= "0xEFd2000dBC5b5C897823eEFCcAA99d5DC2Ce7DBA";
+  const REG  = "0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02";
+  const T721 = "0x95e75771B4e066A7edAD62d8d7CbDD50307c814e";
+  const T1155= "0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0";
 
   const provider = hre.ethers.provider;
 

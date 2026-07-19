@@ -149,10 +149,9 @@ Redeployed on GembaBlockchain. Current addresses are in [`blockchain/deployed/ge
 
 | Contract | Address |
 |---|---|
-| PlatformRegistry | `0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191` |
-| EventContract721 (template) | `0x2481644e460A77B072c28f209055A3e86764192F` |
-| EventContract1155 (template) | `0xEFd2000dBC5b5C897823eEFCcAA99d5DC2Ce7DBA` |
-| Claim | `0x32c4EFa02D33d6aEb81fEC72d6C1a868edd7229e` |
+| PlatformRegistry | `0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02` |
+| EventContract721 (template) | `0x95e75771B4e066A7edAD62d8d7CbDD50307c814e` |
+| EventContract1155 (template) | `0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0` |
 
 Per-event contracts are EIP-1167 minimal-proxy clones of the templates, deployed on demand (free).
 

@@ -90,7 +90,7 @@ so the recipient can confirm they are paying for the right thing before typing t
 
 ```bash
 # Trigger a login OTP
-curl -X POST http://localhost:3080/api/auth/login \
+curl -X POST http://localhost:3100/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"..."}'
 # → { "otpRequired": true }

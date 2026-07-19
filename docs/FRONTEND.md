@@ -6,10 +6,10 @@
 
 | App | Subdomain | Port | Purpose |
 |---|---|---|---|
-| **Storefront** | `gembaticket.com` | :3083 | Event browsing, guest checkout, public ticket view, NFT claim. |
-| **Dashboard** | `dashboard.gembaticket.com` | :3084 | Organizer workspace — events, supply, scanners, zones, chain actions. |
-| **Scanner PWA** | `scanner.gembaticket.com` | :3087 | Gate-staff app — QR decode, offline outbox, zone enforcement. |
-| **Admin** | internal | :3085 | Operator console — refund review, webhook replay, block-sync diagnostics. |
+| **Storefront** | `gembaticket.com` | :3103 | Event browsing, guest checkout, public ticket view, NFT claim. |
+| **Dashboard** | `dashboard.gembaticket.com` | :3104 | Organizer workspace — events, supply, scanners, zones, chain actions. |
+| **Scanner PWA** | `scanner.gembaticket.com` | :3107 | Gate-staff app — QR decode, offline outbox, zone enforcement. |
+| **Admin** | internal | :3105 | Operator console — refund review, webhook replay, block-sync diagnostics. |
 
 ## Common stack
 

@@ -7,11 +7,11 @@ Raspberry Pi 5 (ARM64), Ubuntu Server, Apache 2.4 reverse proxy, systemd service
 ## Systemd services
 
 ```
-gembaticket-api              node backend/src/server.js                :3080
-gembaticket-web              serve frontend/ticket-web/dist            :3083
-gembaticket-dashboard        serve frontend/ticket-dashboard/dist      :3084
-gembaticket-admin            serve frontend/ticket-admin/build         :3085
-gembaticket-scanner-pwa      serve scanner/dist                        :3087
+gembaticket-api              node backend/src/server.js                :3100
+gembaticket-web              serve frontend/ticket-web/dist            :3103
+gembaticket-dashboard        serve frontend/ticket-dashboard/dist      :3104
+gembaticket-admin            serve frontend/ticket-admin/build         :3105
+gembaticket-scanner-pwa      serve scanner/dist                        :3107
 gembaticket-scanner          node backend/src/workers/scannerServer.js
 gembaticket-listener         node backend/src/workers/eventListener.js
 gembaticket-chain-worker     node backend/src/workers/chainActivationWorker.js
@@ -45,8 +45,8 @@ Each subdomain has its own vhost. Origin cert from Cloudflare, wildcard for `*.g
   SSLCertificateKeyFile /etc/ssl/cloudflare/origin.key
 
   ProxyPreserveHost On
-  ProxyPass        / http://127.0.0.1:3080/
-  ProxyPassReverse / http://127.0.0.1:3080/
+  ProxyPass        / http://127.0.0.1:3100/
+  ProxyPassReverse / http://127.0.0.1:3100/
 
   # Raw body for GembaPay webhook HMAC verification
   # (handled by the Node layer via req.rawBody)
@@ -58,8 +58,8 @@ Each subdomain has its own vhost. Origin cert from Cloudflare, wildcard for `*.g
   ServerName scanner.gembaticket.com
   SSLEngine on
   ...
-  ProxyPass        / http://127.0.0.1:3087/
-  ProxyPassReverse / http://127.0.0.1:3087/
+  ProxyPass        / http://127.0.0.1:3107/
+  ProxyPassReverse / http://127.0.0.1:3107/
 
   # Camera access requires explicit policy on this subdomain
   Header always set Permissions-Policy "camera=(self)"
@@ -71,14 +71,14 @@ Each subdomain has its own vhost. Origin cert from Cloudflare, wildcard for `*.g
 | Service | Port |
 |---|---|
 | Apache (public) | 80 / 443 |
-| API (`gembaticket-api`) | 3080 |
-| Storefront | 3083 |
-| Dashboard | 3084 |
-| Admin | 3085 |
-| Scanner PWA | 3087 |
+| API (`gembaticket-api`) | 3100 |
+| Storefront | 3103 |
+| Dashboard | 3104 |
+| Admin | 3105 |
+| Scanner PWA | 3107 |
 | PostgreSQL | 5432 |
 | Redis | **6380** (not default 6379) |
-| chain worker health | 3086 |
+| chain worker health | 3106 |
 
 ## Build & ship
 

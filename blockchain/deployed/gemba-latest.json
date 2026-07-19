@@ -2,44 +2,36 @@
   "version": "3.1",
   "network": "gemba-testnet",
   "chainId": 821207,
-  "rpc": "https://testnet.gembascan.io/rpc",
+  "rpc": "https://rpc1.gembascan.io",
   "explorer": "https://testnet.gembascan.io",
   "timestamp": "2026-06-09T00:00:00.000Z",
+  "lastVerified": "2026-07-19",
   "deployer": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
-  "changes": "v3.1 adds GASLESS relayed claiming. New EventContract721V3 / EventContract1155V3 templates add a `relayer` role (default = the platform broadcasting wallet) and `claimTicketFor(recipient, [typeId,] claimHash, signature)`: the platform relayer broadcasts and pays the gas, so the holder mints the NFT for 0 GMB and signs only a free off-chain ownership message. The mintSigner signature binds the recipient, so a compromised relayer cannot redirect a mint; on-chain usedClaims[claimHash] + DB nftClaimed make double-mint impossible. The original client-pays `claimTicket` is preserved UNCHANGED. PlatformRegistry repointed (setTemplate) to the V3 templates — new events clone V3; existing (immutable) events keep client-pays. Same PlatformRegistry, mintSigner, Claim singleton and roles. Zero platform fees.",
+  "note": "Contract addresses below are the CURRENT live deployment, verified on-chain against PlatformRegistry.erc721Template() / erc1155Template() at registry 0x32977E…. An earlier v3.1 snapshot of this file listed template addresses 0x791ca…/0xa0bb3…, legacy templates 0x2481…/0xEFd2…, and a standalone Claim singleton 0x32c4EF… — a chain regenesis wiped those and they now hold ZERO code. The live registry clones the two templates below; claiming is signature-based (mintSigner + relayer), so there is no standalone Claim contract in the current deployment.",
+  "changes": "GASLESS relayed claiming (v3.1). The EventContract721/1155 templates include a `relayer` role (owner-changeable via setRelayer) and `claimTicketFor(recipient,[typeId,]claimHash,signature)`: the platform relayer broadcasts and pays the gas, so the holder mints the NFT for 0 GMB and only signs a free off-chain ownership message. The mintSigner signature binds the recipient, so a compromised relayer cannot redirect a mint; on-chain usedClaims[claimHash] + DB nftClaimed make double-mint impossible. The original client-pays `claimTicket` is preserved on-chain (route disabled). New events clone the ACTIVE templates below.",
   "contracts": {
     "PlatformRegistry": {
-      "address": "0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191",
-      "type": "singleton"
-    },
-    "EventContract721V3": {
-      "address": "0x791ca5761a69FA9826505cb92f68B26ef399E230",
-      "type": "template (EIP-1167) — ACTIVE",
-      "verified": "https://testnet.gembascan.io/address/0x791ca5761a69FA9826505cb92f68B26ef399E230#code"
-    },
-    "EventContract1155V3": {
-      "address": "0xa0bb315bc095F0ECf70feC60fFd6BEd4Dfc2F381",
-      "type": "template (EIP-1167) — ACTIVE",
-      "verified": "https://testnet.gembascan.io/address/0xa0bb315bc095F0ECf70feC60fFd6BEd4Dfc2F381#code"
+      "address": "0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02",
+      "type": "singleton",
+      "verified": "https://testnet.gembascan.io/address/0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02#code"
     },
     "EventContract721": {
-      "address": "0x2481644e460A77B072c28f209055A3e86764192F",
-      "type": "template (EIP-1167) — legacy v2, no longer cloned by the registry"
+      "address": "0x95e75771B4e066A7edAD62d8d7CbDD50307c814e",
+      "type": "template (EIP-1167) — ACTIVE, cloned by the registry",
+      "verified": "https://testnet.gembascan.io/address/0x95e75771B4e066A7edAD62d8d7CbDD50307c814e#code"
     },
     "EventContract1155": {
-      "address": "0xEFd2000dBC5b5C897823eEFCcAA99d5DC2Ce7DBA",
-      "type": "template (EIP-1167) — legacy v2, no longer cloned by the registry"
-    },
-    "Claim": {
-      "address": "0x32c4EFa02D33d6aEb81fEC72d6C1a868edd7229e",
-      "type": "singleton"
+      "address": "0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0",
+      "type": "template (EIP-1167) — ACTIVE, cloned by the registry",
+      "verified": "https://testnet.gembascan.io/address/0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0#code"
     }
   },
   "configuration": {
-    "admin": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
-    "platformSigner": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
+    "admin": "0x56Ee422312C92eBa99EaaFa5Fe5c3a1CAF77B9c2",
+    "platformSigner": "0x56Ee422312C92eBa99EaaFa5Fe5c3a1CAF77B9c2",
+    "multisig": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
     "mintSigner": "0x3418196aBeC513A95dF013751bcE036C7b27fa5a",
-    "relayer": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298 (= platformSigner; default on every V3 clone, owner-changeable via setRelayer)",
+    "relayer": "Separate broadcasting wallet (backend RELAYER_KEY). Each V3 clone's relayer role defaults to the platform and is re-pointed to this wallet by the backend at event setup (setRelayer); owner-changeable.",
     "claimFlow": "GASLESS: holder signs a free off-chain ownership message -> backend POST /api/claim/relay -> mintSigner signs (contract,[typeId,]claimHash,recipient) -> relayer broadcasts claimTicketFor() and pays gas -> NFT minted to the holder for 0 GMB. Original client-pays claimTicket preserved (route disabled).",
     "payments": "All payments via GembaPay (contracts are payment-agnostic); 0 platform fees",
     "gas": "Negligible — GembaBlockchain native gas ~0; relayer sponsors mint gas so holders pay/sign nothing on-chain",

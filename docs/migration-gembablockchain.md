@@ -11,7 +11,7 @@ from Ethereum Sepolia to **GembaBlockchain testnet** (the project's own L1).
 
 ## Network switch (Sepolia → GembaBlockchain)
 - Chain: **GembaBlockchain testnet, chainId 821207** (was Sepolia 11155111).
-- RPC: `https://testnet.gembascan.io/rpc` (+ rpc1/rpc2 fallback). Explorer: GembaScan.
+- RPC: `https://rpc1.gembascan.io` (+ rpc1/rpc2/rpc3 fallback). Explorer: GembaScan.
 - The event listener is single-chain (driven by `CHAIN_ID`); other networks'
   configs remain in code but are inactive. Legacy Sepolia data is **retained**
   as historical records; new events live on GembaBlockchain.
@@ -19,7 +19,7 @@ from Ethereum Sepolia to **GembaBlockchain testnet** (the project's own L1).
 ## Contracts (GembaBlockchain testnet, verified on GembaScan)
 | Contract | Address |
 |---|---|
-| PlatformRegistry | `0xAAe144b80AbE5e8f03Af181a63f4E8f9c7F91191` |
+| PlatformRegistry | `0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02` |
 | EventContract721 (template) | `0x95e75771B4e066A7edAD62d8d7CbDD50307c814e` |
 | EventContract1155 (template) | `0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0` |
 

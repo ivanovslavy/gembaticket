@@ -15,7 +15,7 @@
               └─────┬───────────┬───────────┬───────────┬──────────┬─────┘
                     │           │           │           │          │
              ┌──────▼──┐  ┌─────▼─────┐ ┌───▼─────┐ ┌──▼────┐ ┌───▼────┐
-             │ :3083   │  │  :3080    │ │ :3084   │ │:3087  │ │ gateway│
+             │ :3103   │  │  :3100    │ │ :3104   │ │:3107  │ │ gateway│
              │ web SPA │  │ API       │ │ dashboard│ │scanner│ │ IPFS   │
              │         │  │ Express + │ │ SPA     │ │ PWA   │ │ public │
              │         │  │ Prisma    │ │         │ │       │ │ CID    │
@@ -47,10 +47,10 @@
 
 | Component | Runtime | Purpose |
 |---|---|---|
-| **Storefront** (`gembaticket.com`) | React 19 SPA served by `serve` on :3083 | Event browsing, guest checkout, ticket view (`/ticket/:id`), NFT claim |
-| **Dashboard** (`dashboard.`) | React 19 SPA on :3084 | Organizer UX — event creation, deploy payment, supply management, scanners, zones, action history |
-| **API** (`api.`) | Node 20 + Express on :3080 | Public REST endpoints, webhook handlers, JWT auth, OTP, ticket lifecycle |
-| **Scanner PWA** (`scanner.`) | Static Vite build on :3087 | Gate-staff app — QR decode, offline outbox (Dexie), zone enforcement |
+| **Storefront** (`gembaticket.com`) | React 19 SPA served by `serve` on :3103 | Event browsing, guest checkout, ticket view (`/ticket/:id`), NFT claim |
+| **Dashboard** (`dashboard.`) | React 19 SPA on :3104 | Organizer UX — event creation, deploy payment, supply management, scanners, zones, action history |
+| **API** (`api.`) | Node 20 + Express on :3100 | Public REST endpoints, webhook handlers, JWT auth, OTP, ticket lifecycle |
+| **Scanner PWA** (`scanner.`) | Static Vite build on :3107 | Gate-staff app — QR decode, offline outbox (Dexie), zone enforcement |
 | **Event listener** (worker) | Node 20 | Watches PlatformRegistry + Event contracts, mirrors on-chain state to Prisma (via `BlockSync`) |
 | **Chain worker** (`chainActivationWorker`) | Node 20 | Processes the `ChainJob` queue — ticket activation + paid chain actions. Exponential backoff at `[30s, 2m, 10m, 1h, 4h]` up to 5 attempts |
 | **Scanner server** (worker) | Node 20 | Hot-path validator for scanner devices (bcrypt apiKey compares happen in-process) |
@@ -59,10 +59,10 @@
 
 | Subdomain | Backend | TLS |
 |---|---|---|
-| `gembaticket.com` | :3083 (storefront) | Cloudflare Origin |
-| `api.gembaticket.com` | :3080 (API) | Cloudflare Origin |
-| `dashboard.gembaticket.com` | :3084 (dashboard SPA) | Cloudflare Origin |
-| `scanner.gembaticket.com` | :3087 (scanner PWA) | Cloudflare Origin (HTTPS required for camera) |
+| `gembaticket.com` | :3103 (storefront) | Cloudflare Origin |
+| `api.gembaticket.com` | :3100 (API) | Cloudflare Origin |
+| `dashboard.gembaticket.com` | :3104 (dashboard SPA) | Cloudflare Origin |
+| `scanner.gembaticket.com` | :3107 (scanner PWA) | Cloudflare Origin (HTTPS required for camera) |
 | `listener.gembaticket.com` | worker health endpoint | Cloudflare Origin |
 | `ipfs.gembaticket.com` | IPFS gateway | Cloudflare Origin |
 
@@ -151,7 +151,7 @@ Served from the storefront public root (Vite `/public`):
 
 ## RPC fallback pool
 
-All read/write calls to GembaBlockchain flow through `backend/src/utils/fallbackProvider.js` — a `FallbackJsonRpcProvider` that wraps 15 endpoints (`backend/src/config/rpcEndpoints.js`). Public nodes (publicnode, drpc, 1rpc, blastapi, omniatech, Ankr) are tried first so keyed endpoints (Infura, Alchemy, QuickNode, Moralis, Ankr-keyed) don't burn their quota; on a transient error (`429`, `5xx`, `-32090 retry-after`, missing-response / timeout) the provider rotates to the next endpoint and honours the advertised cooldown. Contract reverts bubble up unchanged. The active pool targets **GembaBlockchain** RPC endpoints (`testnet.gembascan.io/rpc` plus `rpc1`/`rpc2.gembascan.io`) — GembaTicket's own EVM Layer-1 (the platform was originally planned for Polygon; it now runs on GembaBlockchain).
+All read/write calls to GembaBlockchain flow through `backend/src/utils/fallbackProvider.js` — a `FallbackJsonRpcProvider` that wraps 15 endpoints (`backend/src/config/rpcEndpoints.js`). Public nodes (publicnode, drpc, 1rpc, blastapi, omniatech, Ankr) are tried first so keyed endpoints (Infura, Alchemy, QuickNode, Moralis, Ankr-keyed) don't burn their quota; on a transient error (`429`, `5xx`, `-32090 retry-after`, missing-response / timeout) the provider rotates to the next endpoint and honours the advertised cooldown. Contract reverts bubble up unchanged. The active pool targets **GembaBlockchain** RPC endpoints (`rpc1`/`rpc2`/`rpc3.gembascan.io`) — GembaTicket's own EVM Layer-1 (the platform was originally planned for Polygon; it now runs on GembaBlockchain).
 
 ## Observability
 

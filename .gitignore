@@ -10,6 +10,7 @@
 backend/
 frontend/
 scanner/
+rpi-reader/
 
 # -------- Blockchain folder: keep contracts/docs/scripts/audits, exclude build output --------
 blockchain/artifacts/
@@ -103,3 +104,8 @@ PROGRESS.md
 
 # Security audit reports - sensitive, keep OUT of the repo (public)
 security-audit/
+COLD-KEY-LOCATION.txt
+backup/
+*.dump
+*.bak-*
+*.bak.*
