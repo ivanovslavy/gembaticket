@@ -1,6 +1,6 @@
 # GembaTicket — smart contracts & audit artifacts
 
-Audit-grade Solidity layer for **GembaTicket v3**. Non-custodial event ticketing with optional ERC-721 / ERC-1155 NFT collectibles, deployed as EIP-1167 minimal-proxy clones via a `PlatformRegistry` factory.
+Audit-grade Solidity layer for **GembaTicket v3**. Direct-settlement event ticketing with optional ERC-721 / ERC-1155 NFT collectibles, deployed as EIP-1167 minimal-proxy clones via a `PlatformRegistry` factory.
 
 **Company:** GEMBA EOOD (EIK: 208656371), Varna, Bulgaria
 **Network:** Ethereum Sepolia (testnet); production target TBD

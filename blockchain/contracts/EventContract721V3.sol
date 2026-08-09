@@ -259,6 +259,7 @@ contract EventContract721V3 is
 
     /// @notice Activate a ticket on first venue scan. Locks transfers.
     function activateTicket(uint256 _tokenId) external onlyPlatform {
+        _requireOwned(_tokenId); // G1: a tokenId that was never minted cannot be pre-activated
         if (ticketActivated[_tokenId]) revert AlreadyActivated();
 
         ticketActivated[_tokenId] = true;
@@ -456,6 +457,8 @@ contract EventContract721V3 is
 
         if (v < 27) v += 27;
         if (v != 27 && v != 28) return address(0);
+        // G1 (EIP-2): reject the high-s (malleable) half — one canonical signature only.
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) return address(0);
 
         return ecrecover(_hash, v, r, s);
     }

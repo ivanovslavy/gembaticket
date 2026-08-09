@@ -1,6 +1,6 @@
 # GembaTicket v2 — Smart Contract Security Audit Report
 
-**Project:** GembaTicket v2 — Non-Custodial NFT Ticketing Platform  
+**Project:** GembaTicket v2 — Direct-Settlement NFT Ticketing Platform  
 **Auditor:** Slavcho Ivanov, Managing Director, GEMBA EOOD (EIK: 208656371)  
 **Date:** February 14, 2026  
 **Solidity Version:** 0.8.28 (locked pragma)  
@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-This report documents the security analysis of the GembaTicket v2 smart contract system — a non-custodial, payment-agnostic NFT ticketing platform with lazy minting and signature-based claiming. The contracts were subjected to static analysis (Slither v0.11.5), symbolic execution (Mythril v0.24.8), and comprehensive functional testing (220 assertions across two test suites, 100% pass rate).
+This report documents the security analysis of the GembaTicket v2 smart contract system — a payment-agnostic NFT ticketing platform that never holds funds with lazy minting and signature-based claiming. The contracts were subjected to static analysis (Slither v0.11.5), symbolic execution (Mythril v0.24.8), and comprehensive functional testing (220 assertions across two test suites, 100% pass rate).
 
 **Final Results:**
 
@@ -62,7 +62,7 @@ Per-event clone cost (~100,000 gas via EIP-1167) vs full contract deployment (~2
 
 ### 3.1 Design Philosophy
 
-GembaTicket v2 follows a **payment-agnostic, lazy-mint** architecture. The smart contracts contain zero payment logic — all payments (cryptocurrency and fiat) are processed off-chain by GembaPay. Contracts serve exclusively as NFT lifecycle managers: claim (mint), activate, lock, and transfer.
+GembaTicket v2 follows a **payment-agnostic, lazy-mint** architecture. The smart contracts contain zero payment logic — all payments are processed off-chain by GembaPay. Contracts serve exclusively as NFT lifecycle managers: claim (mint), activate, lock, and transfer.
 
 The key innovation is **signature-based claiming**: tickets exist as database records by default (zero gas). Only buyers who explicitly want the NFT collectible connect a wallet and mint on-chain, paying their own gas (~$0.003 on Polygon).
 
@@ -71,7 +71,7 @@ The key innovation is **signature-based claiming**: tickets exist as database re
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    GembaPay (Off-chain)                  │
-│          Handles all crypto + fiat payments              │
+│          Handles all card & PayPal payments              │
 │              Sends webhook on confirmation               │
 └─────────────────────┬───────────────────────────────────┘
                       │ webhook
@@ -107,7 +107,7 @@ The key innovation is **signature-based claiming**: tickets exist as database re
 The claim system uses backend-signed EIP-712 messages to authorize NFT minting:
 
 ```
-1. Buyer purchases ticket via GembaPay (fiat or crypto)
+1. Buyer purchases ticket via GembaPay (card or PayPal)
 2. Ticket stored in database (no blockchain interaction)
 3. Buyer clicks "Claim as NFT" on ticket page
 4. Buyer connects wallet (MetaMask or similar)

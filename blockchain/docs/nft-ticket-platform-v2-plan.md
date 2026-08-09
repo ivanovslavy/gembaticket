@@ -15,7 +15,7 @@
 
 ### 1.2 Ключови принципи
 
-- **ZERO CUSTODY** — платформата не държи нито crypto, нито fiat, нито private keys, нито NFT-та от името на потребители
+- **ZERO CUSTODY** — платформата не държи средства, нито private keys, нито NFT-та от името на потребители
 - **BLOCKCHAIN INVISIBLE** — потребителите (организатори и купувачи) работят с email, карти и QR кодове; blockchain е невидим слой отдолу
 - **GEMBAPAY POWERED** — всички плащания (fiat и crypto) минават през GembaPay; GEMBA EOOD получава само платформена такса
 - **NFT = БОНУС** — билетът работи без NFT; NFT е опционален claim за потребители, които го искат
@@ -1463,7 +1463,7 @@ Infrastructure:
 |----------------|-----------|-----------|
 | Custody | ❌ Custodial (PK + fiat) | ✅ Zero custody |
 | Blockchain знания | ❌ Нужни | ✅ Не са нужни |
-| Плащания | ❌ Директен Stripe | ✅ GembaPay (non-custodial) |
+| Плащания | ❌ Директен Stripe | ✅ GembaPay (direct settlement) |
 | NFT Metadata | ❌ Няма | ✅ IPFS + dynamic |
 | Scanner | ❌ Няма app | ✅ PWA + rotating QR |
 | Anti-fraud | ❌ Минимален | ✅ HMAC + device bind + lock |

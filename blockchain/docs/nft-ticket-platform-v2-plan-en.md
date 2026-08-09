@@ -15,9 +15,9 @@ A ticketing platform that works like Eventbrite for the end user, but under the 
 
 ### 1.2 Key Principles
 
-- **ZERO CUSTODY** — the platform holds no crypto, no fiat, no private keys, and no NFTs on behalf of users
+- **ZERO CUSTODY** — the platform holds no funds, no private keys, and no NFTs on behalf of users
 - **BLOCKCHAIN INVISIBLE** — users (organizers and buyers) work with email, cards, and QR codes; blockchain is an invisible layer underneath
-- **GEMBAPAY POWERED** — all payments (fiat and crypto) go through GembaPay; GEMBA EOOD receives only the platform fee
+- **GEMBAPAY POWERED** — all payments go through GembaPay; GEMBA EOOD receives only the platform fee
 - **NFT = BONUS** — the ticket works without NFT; NFT is an optional claim for users who want it
 - **MAXIMUM SECURITY** — rotating QR, device binding, transfer lock after first scan, HMAC verification
 - **PLATFORM COVERS GAS** — all blockchain transaction costs (minting, activation) are paid by the platform from PlatformTreasury, funded by the 5% platform fee; no user ever pays or sees gas fees
@@ -1282,7 +1282,7 @@ ipfs swarm connect /ip4/<VPS2_IP>/tcp/4001/p2p/<VPS2_PEER_ID>
 2. Clicks "Become an Organizer"
 3. Redirect to GembaPay merchant onboarding:
    → Stripe Connect onboarding (for cards)
-   → Select crypto networks and currencies to accept
+   → Select the payment methods to accept
    → KYC (if required by Stripe)
 4. Webhook: merchant.onboarded → platform records merchant_id
 5. Organizer can now create events
@@ -1544,7 +1544,7 @@ Infrastructure:
 |---------|-------------|-----------|
 | Custody | ❌ Custodial (PK + fiat) | ✅ Zero custody |
 | Blockchain knowledge | ❌ Required | ✅ Not required |
-| Payments | ❌ Direct Stripe | ✅ GembaPay (non-custodial) |
+| Payments | ❌ Direct Stripe | ✅ GembaPay (direct settlement) |
 | Gas costs | ❌ User/minter pays | ✅ Platform absorbs from 5% fee |
 | NFT Metadata | ❌ None (broken) | ✅ IPFS + dynamic 3-page |
 | Scanner | ❌ No app exists | ✅ PWA + rotating QR |
@@ -1552,7 +1552,7 @@ Infrastructure:
 | Ticket transfer | ❌ Not supported | ✅ Free before scan, locked after |
 | Solidity LOC | ~4150 | ~978 (76% reduction) |
 | Backend LOC | ~12700 | ~8000 (est.) |
-| Regulation | ❌ CASP license needed | ✅ Clean non-custodial |
+| Regulation | ❌ licensing burden \| ✅ Clean direct settlement |
 | Refunds | ❌ No mechanism | ✅ Tracking + reputation + ban |
 | NFT Experience | ❌ Empty/broken NFTs | ✅ 3-page animated + glowing |
 

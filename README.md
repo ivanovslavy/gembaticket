@@ -1,10 +1,10 @@
 # GembaTicket
 
-**A modern web3 ticket-sales platform — completely free.** GembaTicket lets organizers sell tickets online and receive the proceeds directly into their own balances at the moment of purchase. It removes printed paper tickets, gives organizers **full control over access to the event's different entrances/gates**, and leaves a **permanent NFT keepsake** in the hands of attendees. Buyers pay with card or crypto via GembaPay, and every ticket is an ERC-721 or ERC-1155 multi-page NFT on **GembaBlockchain**. Rotating QRs at the gate, tiered tickets (Early Bird / Regular / VIP / Stage), per-zone scanners, and a workflow where the platform signs on the organizer's behalf so no Web3 knowledge is required.
+**A modern web3 ticket-sales platform — completely free.** GembaTicket lets organizers sell tickets online and receive the proceeds directly into their own balances at the moment of purchase. It removes printed paper tickets, gives organizers **full control over access to the event's different entrances/gates**, and leaves a **permanent NFT keepsake** in the hands of attendees. Buyers pay by card or PayPal via GembaPay, and every ticket is an ERC-721 or ERC-1155 multi-page NFT on **GembaBlockchain**. Rotating QRs at the gate, tiered tickets (Early Bird / Regular / VIP / Stage), per-zone scanners, and a workflow where the platform signs on the organizer's behalf so no Web3 knowledge is required.
 
-> **0 fees.** GembaTicket is a next-generation, blockchain-based platform that runs on **GembaBlockchain** and charges **no platform fees, no commissions, no hidden costs**. The only transaction costs come from the payment provider: GembaPay (standard **1%**), plus Stripe/PayPal's own fees on card/PayPal payments; web3-wallet payments incur only the GembaPay fee. See the [Terms](https://gembaticket.com/terms) and [Refund Policy](https://gembaticket.com/refund).
+> **0 fees.** GembaTicket is a next-generation, blockchain-based platform that runs on **GembaBlockchain** and charges **no platform fees, no commissions, no hidden costs**. The only transaction costs come from the payment provider: GembaPay (standard **1%**), plus Stripe/PayPal's own fees on card and PayPal payments. See the [Terms](https://gembaticket.com/terms) and [Refund Policy](https://gembaticket.com/refund).
 
-> **GembaBlockchain — our own EVM-compatible Layer-1, with ~0 gas fees** (testnet now, mainnet soon). The blockchain is an **invisible layer**: the backend signs transactions when needed, so attendees and organizers **never deal with wallets, gas, or signing** — a modern, user-friendly experience.
+> **GembaBlockchain — our own EVM-compatible Layer-1, with ~0 gas fees** (public testnet). The blockchain is an **invisible layer**: the backend signs transactions when needed, so attendees and organizers **never deal with wallets, gas, or signing** — a modern, user-friendly experience.
 
 > **No account needed for attendees.** Buyers receive their ticket **directly by email** and open it from there **without creating an account**. Each ticket is a **multi-page NFT** — event poster image, on-chain event details (date, venue, ticket type), and an interactive QR page — optionally claimable to a self-custodial wallet.
 
@@ -26,7 +26,7 @@
 Event ticketing built for organizers who don't touch wallets, and for attendees who never have to.
 
 - **Organizers** log in with **email + password (Web2) or their Web3 wallet via Sign-In With Ethereum (SIWE)**, create events on the dashboard **for free**, and get a real on-chain contract for their event. Every supply change, sale toggle, or new ticket type is an on-chain action signed by the platform's operator address on their behalf — **no platform fee, only negligible network gas**. No wallet required. **Two-factor authentication** (email code or authenticator app) and **in-dashboard notifications** are built in.
-- **Attendees** buy tickets with a card (or crypto) through GembaPay. Each paid ticket is minted to a "ghost wallet" the system creates from their email. They can later claim the NFT to any real wallet, or just use the rotating-QR at the door and forget it's on-chain.
+- **Attendees** buy tickets by card or PayPal through GembaPay. Each paid ticket is minted to a "ghost wallet" the system creates from their email. They can later claim the NFT to any real wallet, or just use the rotating-QR at the door and forget it's on-chain.
 - **Gate staff** open a PWA on a phone, paste a one-time key, and scan. QR payloads rotate every 30 seconds so a screenshot can't be reused. Zone restrictions (`zoneLevel`) are enforced server-side.
 
 ## How it works
@@ -70,13 +70,13 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - **On-chain actions** — increase supply, add a ticket type, toggle a type or the sale; signed by the platform on the organizer's behalf. **No platform fee — only negligible network gas.** Failed transactions refund automatically; successful ones sync to the database and trigger an email.
 - **Relay operator** — a four-role contract model (Owner / Operator / Platform / MintSigner) lets the platform act on the organizer's behalf by default, while the organizer keeps sovereign control and can revoke the relay at any time.
 - **Scanners + zones** — provision hardware-agnostic scanners with reversible AES-encrypted keys, scoped to specific zone levels.
-- **GembaPay (with KYC) is the payment provider** — organizers register with GembaPay, complete KYC, and add their API key + webhook secret in settings before they can sell. Funds settle directly to the organizer (Stripe / PayPal / web3 wallet); **refunds are the organizer's responsibility** via GembaPay's refund dashboard.
+- **GembaPay (with KYC) is the payment provider** — organizers register with GembaPay, complete KYC, and add their API key + webhook secret in settings before they can sell. Funds settle directly to the organizer (Stripe / PayPal); **refunds are the organizer's responsibility** via GembaPay's refund dashboard.
 
 ### For attendees
 - **No account required** — your ticket is delivered **by email** and opens directly from there; signing up is optional.
 - **Multi-page NFT ticket** — event poster image + on-chain event details (date, venue, ticket type) + an interactive QR page.
 - **Invisible blockchain** — no wallet, gas, or signing; the platform handles all on-chain steps for you.
-- Card, crypto, PayPal (via GembaPay) — no wallet required.
+- Card and PayPal (via GembaPay) — no wallet required.
 - OTP-verified email before purchase (anti-bot, anti-typo).
 - **Optional two-factor authentication** on the account (email code or authenticator app).
 - Rotating QR ticket page at `/ticket/:id` — auto-refresh every 30 s.
@@ -98,7 +98,7 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 | Storefront | React 19, Vite 6, Tailwind 4, Framer Motion, RainbowKit + Wagmi, react-helmet-async |
 | Dashboard | React 19, Vite 6, Tailwind 4 |
 | Scanner PWA | React 19, `html5-qrcode`, Dexie (IndexedDB offline outbox) |
-| Payments | GembaPay (cards, crypto, PayPal — sister product) |
+| Payments | GembaPay (cards and PayPal — sister product) |
 | Email | SMTP (Gmail for now; Resend migration planned) |
 | Hosting | Hetzner (Ubuntu) / Apache / systemd / Cloudflare |
 
@@ -141,7 +141,7 @@ Application source code (`backend/`, `frontend/`, `scanner/`) is intentionally *
 | API | https://api.gembaticket.com |
 | Scanner PWA | https://scanner.gembaticket.com |
 | Explorer | https://testnet.gembascan.io (GembaScan) |
-| Chain | GembaBlockchain testnet (chainId 821207) — mainnet 821206 rolling out |
+| Chain | GembaBlockchain testnet (chainId 821207) |
 
 ### Contracts (GembaBlockchain testnet, chainId 821207)
 

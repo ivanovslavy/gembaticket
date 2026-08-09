@@ -1,6 +1,6 @@
 # Service fees disabled on GembaBlockchain + anti-spam rate limits (2026-06)
 
-GembaTicket was built for Ethereum mainnet, where each on-chain write costs real
+GembaTicket was originally built for a public EVM network, where each on-chain write costs real
 gas paid by the platform backend key. Organizers therefore paid a service fee for:
 1. **Event creation** (deploy contract),
 2. **Add ticket type**,

@@ -46,6 +46,7 @@ contract EventContract1155V3 is
     error AlreadyExecuted();
     error NotRelayer();          // v3: caller is not the authorized gasless-claim relayer
     error RelayerDisabled();     // v3: gasless claiming is turned off (relayer == address(0))
+    error NonexistentToken();    // G1: activateTicket on a tokenId that was never minted
 
     // =========================================================================
     // EVENTS
@@ -329,6 +330,7 @@ contract EventContract1155V3 is
 
     /// @notice Activate a ticket on first venue scan. Locks transfers.
     function activateTicket(uint256 _tokenId) external onlyPlatform {
+        if (_tokenId == 0 || _tokenId > totalMinted) revert NonexistentToken(); // G1: must be minted
         if (ticketActivated[_tokenId]) revert AlreadyActivated();
 
         ticketActivated[_tokenId] = true;
@@ -580,6 +582,8 @@ contract EventContract1155V3 is
 
         if (v < 27) v += 27;
         if (v != 27 && v != 28) return address(0);
+        // G1 (EIP-2): reject the high-s (malleable) half — one canonical signature only.
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) return address(0);
 
         return ecrecover(_hash, v, r, s);
     }
