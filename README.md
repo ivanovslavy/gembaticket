@@ -67,10 +67,14 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - **Two-factor authentication** — optional 2FA at login by **email code** or **authenticator app (TOTP)**; the method is a single setting shown consistently across the dashboard and the storefront.
 - **In-dashboard notifications** — a notification bell plus per-event email updates (deploys, sales, chain actions); notification preferences are configurable in Settings.
 - **Deploy on demand — free** — spins up a fresh EIP-1167 clone of either `EventContract721` or `EventContract1155` and registers ticket types on-chain. **No deploy fee.**
-- **On-chain actions** — increase supply, add a ticket type, toggle a type or the sale; signed by the platform on the organizer's behalf. **No platform fee — only negligible network gas.** Failed transactions refund automatically; successful ones sync to the database and trigger an email.
-- **Relay operator** — a four-role contract model (Owner / Operator / Platform / MintSigner) lets the platform act on the organizer's behalf by default, while the organizer keeps sovereign control and can revoke the relay at any time.
+- **On-chain actions** — increase supply, add a ticket type, toggle a type or the sale; signed by the platform on the organizer's behalf. **No platform fee — only negligible network gas.** Successful ones sync to the database and trigger an email (in the dormant paid mode a failed paid action is refunded automatically).
+- **Relay operator** — a role-separated contract model (Owner / Operator / Platform / Relayer / MintSigner) lets the platform act on the organizer's behalf by default, while the organizer keeps sovereign control and can revoke the relay at any time.
 - **Scanners + zones** — provision hardware-agnostic scanners with reversible AES-encrypted keys, scoped to specific zone levels.
-- **GembaPay (with KYC) is the payment provider** — organizers register with GembaPay, complete KYC, and add their API key + webhook secret in settings before they can sell. Funds settle directly to the organizer (Stripe / PayPal); **refunds are the organizer's responsibility** via GembaPay's refund dashboard.
+- **Discount codes** — percent or fixed amount, per ticket type, with a use limit and expiry; checked on the server inside the purchase.
+- **Cancel or let it end** — cancel with automatic or manual refunds (buyers e-mailed, tickets void at the gate); events end on their own when the last entry window closes.
+- **CSV export** — every ticket with price paid, discount, NFT claim, scan and refund status.
+- **Venue time zones** — every date and time is the venue's local time, wherever the organizer edits from.
+- **GembaPay (with KYC) is the payment provider** — organizers register with GembaPay, complete KYC, and add their API key + webhook secret in settings before they can sell. Funds settle directly to the organizer (Stripe / PayPal); **refunds are the organizer's decision and are paid from their own GembaPay balance** — from GembaPay's refund dashboard, or from the GembaTicket dashboard: refund a single ticket, or cancel an event with automatic refunds (two-factor confirmed).
 
 ### For attendees
 - **No account required** — your ticket is delivered **by email** and opens directly from there; signing up is optional.
@@ -97,7 +101,7 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 | Backend | Node 20, Express, Prisma ORM, JWT, ethers.js v6, Redis 7 (port 6380), PostgreSQL 16 |
 | Storefront | React 19, Vite 6, Tailwind 4, Framer Motion, RainbowKit + Wagmi, react-helmet-async |
 | Dashboard | React 19, Vite 6, Tailwind 4 |
-| Scanner PWA | React 19, `html5-qrcode`, Dexie (IndexedDB offline outbox) |
+| Scanner PWA | React 19, `html5-qrcode`, Dexie (IndexedDB offline snapshot + decision sync) |
 | Payments | GembaPay (cards and PayPal — sister product) |
 | Email | SMTP (Gmail for now; Resend migration planned) |
 | Hosting | Hetzner (Ubuntu) / Apache / systemd / Cloudflare |
