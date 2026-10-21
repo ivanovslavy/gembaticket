@@ -91,10 +91,27 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | POST | `/auth` | scanner-key | Exchange `{ apiKey }` for a short-lived scanner-JWT + scanner/event context. |
 | GET  | `/me` | scanner | Current scanner + event + zones. |
 | POST | `/scan` | scanner | `{ payload }` — read-only check of the rotating QR. `403 { valid: false, reason }` for a wrong event/zone, outside the entry window, a canceled or ended event, or a canceled / refunded / unpaid ticket. |
-| POST | `/activate` | scanner | Admit + burn (same checks). `409` on a second activation. The on-chain `activateTicket` follows asynchronously (chain worker) for claimed NFTs. |
-| POST | `/activate-manual` | scanner | Admit by ticket id when the QR cannot be read. |
-| GET  | `/snapshot` | scanner | Offline mode: active events + valid tickets (per-ticket QR seeds), ETag'd. |
+| POST | `/activate` | scanner | Admit + burn (same checks). `409` on a second activation. `423 { heldBy }` when another gate holds the ticket's offline right and cannot be reached (a reachable one is asked and the call waits ≤ 6 s). The on-chain `activateTicket` follows asynchronously (chain worker) for claimed NFTs. |
+| POST | `/activate-manual` | scanner | Admit by ticket id when the QR cannot be read (same `423` rule). |
+| GET  | `/snapshot` | scanner | Offline mode: active events + valid tickets, ETag'd. Send `X-Offline-Protocol: 2`: a ticket's QR seed comes only to the scanner holding its **offline entry right** (`own`), others carry `holder` (the gate that holds it); `leaseSeq` = the scanner's release counter. Without the header: no seeds. |
+| POST | `/offline/heartbeat` | scanner | `{ released: [ticketId] }` → `{ seq, release: [ticketId], stale }` — every 3 s while online: acknowledge dropped rights, get the ones to drop, `stale` = refetch the snapshot. |
 | POST | `/sync` | scanner | Replay offline door decisions (idempotent per `clientId`; `conflict` = another scanner admitted it first). |
+
+## Platform admin (`/api/admin`)
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET · POST | `/auth/nonce` · `/auth/verify` | public | Wallet sign-in (signature). |
+| POST | `/auth/login` | public | `{ email, password }` → `{ token, admin }` or `{ requires2fa, method: "email"\|"totp", challengeToken }`. |
+| POST | `/auth/login/2fa` | public | `{ challengeToken, code }` — the e-mail code, the app code or a backup code. Single-use challenge, 10 min, 5 tries. |
+| POST | `/auth/logout` | admin | Revokes the token. |
+| GET  | `/me` · `/account` | admin | Session / own account (e-mail, wallet, password set, 2FA method, backup codes left). |
+| POST | `/account/password` | admin | `{ currentPassword?, newPassword }` (min 12). |
+| POST | `/account/email/start` · `/account/email/confirm` | admin | Code to the NEW address → confirm. |
+| GET · POST | `/account/wallet/nonce` · `/account/wallet` | admin | The NEW wallet signs the server-built message → new session; old wallet out. |
+| POST | `/account/2fa/totp/setup` · `/totp/enable` · `/email/enable` · `/disable` · `/backup-codes` | admin | Two-factor (off by default). |
+
+The rest of `/api/admin` (monitoring, organizers, events, chain jobs, admins, master scanners) is internal to the admin panel.
 
 ## Claim (`/api/claim`)
 
@@ -125,5 +142,6 @@ The original client-pays `/sign` + `/confirm` routes are disabled (kept in the c
 | Public reads (`/api/events`, `/api/tickets`) | 120/min per IP |
 | Discount-code check | 20/min per IP (fail-closed) |
 | Deploy and chain actions | 5/min, 50/h, 200/day per IP and per organizer |
-| Scanner | 120/min per scanner; `/auth` 10/min |
+| Scanner | 120/min **per scanner device** (2026-10-21 — was per IP, which every door behind one venue NAT shared), heartbeat 60/min per device, 600/min per IP in front of auth; `/auth` 10/min |
+| Admin e-mail login | 10 / 15 min per IP + 10 failures per e-mail → 15 min lock; 2FA codes 15 / 15 min; account changes 15 / 15 min; codes to a new e-mail 5 / h (all fail closed) |
 | Webhooks | 100/min |

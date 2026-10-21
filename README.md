@@ -70,6 +70,7 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - **On-chain actions** — increase supply, add a ticket type, toggle a type or the sale; signed by the platform on the organizer's behalf. **No platform fee — only negligible network gas.** Successful ones sync to the database and trigger an email (in the dormant paid mode a failed paid action is refunded automatically).
 - **Relay operator** — a role-separated contract model (Owner / Operator / Platform / Relayer / MintSigner) lets the platform act on the organizer's behalf by default, while the organizer keeps sovereign control and can revoke the relay at any time.
 - **Scanners + zones** — provision hardware-agnostic scanners with reversible AES-encrypted keys, scoped to specific zone levels.
+- **Offline gates that never let a ticket in twice** — the scanners keep working without network, and each ticket can be admitted offline at only ONE gate (its offline entry right); a right moves to another gate only after its scanner hands it back.
 - **Discount codes** — percent or fixed amount, per ticket type, with a use limit and expiry; checked on the server inside the purchase.
 - **Cancel or let it end** — cancel with automatic or manual refunds (buyers e-mailed, tickets void at the gate); events end on their own when the last entry window closes.
 - **CSV export** — every ticket with price paid, discount, NFT claim, scan and refund status.
@@ -91,6 +92,7 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - Full on-chain audit trail (`ChainAction` table + Etherscan links per action).
 - GembaPay webhook logs with HMAC verification.
 - SMS-free operations: all flows are JWT + email OTP.
+- **Admin panel sign-in by wallet or by e-mail + password**, with optional two-factor (e-mail code or authenticator app); the e-mail and the wallet can be changed from *My account*.
 
 ## Stack
 
@@ -112,7 +114,7 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 gembaticket.com/
 ├── README.md                 project overview (this file)
 ├── docs/
-│   ├── ADMIN_DASHBOARD.md    platform-admin panel (access + master keys)
+│   ├── ADMIN_DASHBOARD.md    platform-admin panel (sign-in, access + master keys)
 │   ├── ARCHITECTURE.md       system architecture + request paths
 │   ├── API.md                REST endpoints
 │   ├── BACKEND.md            Node API + worker overview (source private)

@@ -249,6 +249,7 @@ Scanner devices authenticate gate staff against `/api/scanner/*`. From the dashb
 3. `POST /api/scanner/auth { apiKey }` → short-lived scanner-JWT bound to the device.
 4. Scans call `/api/scanner/scan` (preview) and `/api/scanner/activate` (admit). With no network the PWA validates against its **offline snapshot** (`/api/scanner/snapshot`) and replays its door decisions via `/api/scanner/sync` when the network returns; a ticket admitted elsewhere in the meantime comes back as a flagged *conflict*.
 5. Canceled or ended events and canceled / refunded tickets are refused at the gate (online, and offline after the next snapshot).
+6. **One offline entry right per ticket** (2026-10-21): the tickets are split between the event's active scanners; offline, a scanner admits only its share, and a right moves to another gate only after its holder hands it back. A gate whose scanner is offline keeps its tickets until it reconnects — **revoke a lost device** to free them.
 
 ---
 

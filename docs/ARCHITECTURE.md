@@ -50,7 +50,7 @@
 | **Storefront** (`gembaticket.com`) | React 19 SPA served by `serve` on :3103 | Event browsing, guest checkout, ticket view (`/ticket/:id`), NFT claim |
 | **Dashboard** (`dashboard.`) | React 19 SPA on :3104 | Organizer UX — event creation, deploy payment, supply management, scanners, zones, action history |
 | **API** (`api.`) | Node 20 + Express on :3100 | Public REST endpoints, webhook handlers, JWT auth, OTP, ticket lifecycle |
-| **Scanner PWA** (`scanner.`) | Static Vite build on :3107 | Gate-staff app — QR decode, offline outbox (Dexie), zone enforcement |
+| **Scanner PWA** (`scanner.`) | Static Vite build on :3107 | Gate-staff app — QR decode, offline mode (snapshot + decisions in Dexie, one offline entry right per ticket), zone enforcement |
 | **Event listener** (worker) | Node 20 | Watches PlatformRegistry + Event contracts, mirrors on-chain state to Prisma (via `BlockSync`) |
 | **Chain worker** (`chainActivationWorker`) | Node 20 | Processes the `ChainJob` queue — ticket activation + paid chain actions. Exponential backoff at `[30s, 2m, 10m, 1h, 4h]` up to 5 attempts |
 | **Scanner server** (worker) | Node 20 | Hot-path validator for scanner devices (bcrypt apiKey compares happen in-process) |
@@ -142,7 +142,7 @@ The client-pays `claimTicket` path still exists in the contract; its `/api/claim
 1. Scanner app sends `Authorization: Bearer <scanner-JWT>` (or `X-Scanner-Key: <plain apiKey>`).
 2. `POST /api/scanner/scan` (preview) / `POST /api/scanner/activate` (admit) — verifies the rotating QR, the device's event / organizer / zone scope, the entry window, and refuses canceled or ended events and canceled / refunded / unpaid tickets; writes `ScanLog`.
 3. For a claimed NFT the activation is mirrored on-chain: an `activate_ticket` ChainJob → the worker calls `activateTicket(tokenId)` as the platform role key.
-4. Offline: the PWA validates against `GET /api/scanner/snapshot` and replays decisions via `POST /api/scanner/sync`; an admission made elsewhere meanwhile returns as a flagged conflict.
+4. Offline: the PWA validates against `GET /api/scanner/snapshot` and replays decisions via `POST /api/scanner/sync`. Each ticket's offline entry right is held by ONE scanner (only it gets the seed; hand-over only with its acknowledgement — `POST /api/scanner/offline/heartbeat`), so two offline gates can never both admit a ticket.
 
 ## SEO + AI discoverability
 

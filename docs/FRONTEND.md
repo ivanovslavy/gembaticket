@@ -8,7 +8,7 @@
 |---|---|---|---|
 | **Storefront** | `gembaticket.com` | :3103 | Event browsing, guest checkout, public ticket view, NFT claim. |
 | **Dashboard** | `dashboard.gembaticket.com` | :3104 | Organizer workspace — events, supply, scanners, zones, chain actions. |
-| **Scanner PWA** | `scanner.gembaticket.com` | :3107 | Gate-staff app — QR decode, offline outbox, zone enforcement. |
+| **Scanner PWA** | `scanner.gembaticket.com` | :3107 | Gate-staff app — QR decode, offline mode with one offline entry right per ticket, zone enforcement. |
 | **Admin** | internal | :3105 | Operator console — refund review, webhook replay, block-sync diagnostics. |
 
 ## Common stack
@@ -59,7 +59,7 @@ Progressive web app that runs in the browser on any Android/iOS device with a ca
 - **Auth**: paste the plain `apiKey` issued in the dashboard → `POST /api/scanner/auth` → short-lived scanner-JWT, stored in IndexedDB.
 - **Camera**: uses `getUserMedia` — requires HTTPS origin, hence the dedicated `scanner.` subdomain with `Permissions-Policy: camera=(self)` on Apache.
 - **QR decode**: rotating payloads (HMAC-signed by the API, 60s TTL) → `POST /api/scanner/validate`.
-- **Offline outbox**: **Dexie** (IndexedDB) buffer for scans made without connectivity; flushes on reconnect.
+- **Offline mode**: **Dexie** (IndexedDB) holds the event snapshot, the door decisions taken offline (replayed on reconnect) and the offline entry rights this scanner released; offline it admits only the tickets whose right it holds (heartbeat every 3 s while online).
 - **Zone enforcement**: server-side, but the UI shows a clear red/green badge based on the zone levels baked into the scanner's JWT.
 
 ## Admin (`ticket-admin`)

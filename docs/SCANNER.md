@@ -38,7 +38,7 @@ While online: GET /api/scanner/snapshot every 60 s (ETag, 304 when unchanged)
 - **Four distinct ticket states:** `ok` (green), `already` (amber), `queued` (blue, offline), `error` (red) — each with its own flash colour, card colour, icon, and beep pitch
 - **Auto-dismiss result card:** 1.5s for `ok`, 2s for `already`, 2.5s for `queued`, 3.5s for `error` — no tap required between scans
 - **Deduplication:** same payload is ignored for 5s after a decode — this guards against html5-qrcode firing its callback multiple times for a single physical scan. Replay of the QR itself is stopped by the ticket side: the QR is HMAC-signed and rotates every 30 s, so a screenshot expires within about a minute
-- **Offline mode:** a local snapshot of the event's valid tickets (active events only — canceled, refunded and ended are left out) lets the scanner validate and admit with no network; each admission is queued as a decision and replayed idempotently via `/api/scanner/sync`. A ticket that another scanner admitted meanwhile comes back as a flagged **conflict**
+- **Offline mode:** a local snapshot of the event's valid tickets (active events only — canceled, refunded and ended are left out) lets the scanner validate and admit with no network; each admission is queued as a decision and replayed idempotently via `/api/scanner/sync`. **One offline entry right per ticket** (2026-10-21): offline, a scanner admits only the tickets whose right it holds, so two offline gates can never both admit the same ticket — see *Offline entry right* below
 - **Scan history:** local history page with outcomes for post-event audit
 - **Manual entry:** fallback page for typing a ticket code when the camera cannot read it
 - **Hardware-aware camera:** requests 1920×1080 @ 30 fps, applies continuous autofocus / exposure / white-balance when the device exposes those capabilities
@@ -113,7 +113,7 @@ Fixed header with event name, scanner label, online/offline indicator, and links
 4. `Scan.jsx` guards with `inflightRef` — at most one activation call is in flight at a time.
 5. On successful HTTP response, `showResult` sets card state + flash + beep + vibration; an effect schedules auto-dismiss.
 6. On HTTP error with `status ∈ {400,401,403,404}` or `409`, the kind is `error` or `already`.
-7. On a network error the scan is decided OFFLINE against the snapshot (`offlineActivate`): a valid v2 QR is admitted locally (a second offline scan of it → `already`) and the decision is queued; the kind is `queued`.
+7. On a network error the scan is decided OFFLINE against the snapshot (`offlineActivate`): a valid v2 QR of a ticket **this scanner holds the offline right for** is admitted locally (a second offline scan of it → `already`) and the decision is queued; the kind is `queued`. A ticket held by another gate is refused with that gate's name. A `423` online means the ticket's right sits with a gate that cannot be reached.
 8. While online, the app refreshes the snapshot and flushes queued decisions (`/api/scanner/sync`, idempotent per `clientId`; `conflict` = admitted elsewhere first).
 
 ## Configuration
@@ -185,7 +185,7 @@ scanner/
 - `camera=(self)` in `Permissions-Policy` is load-bearing — without it, iOS Safari will silently deny `getUserMedia` inside the PWA.
 - Service worker precaches the build assets. After a new deploy, clients get the updated bundle on next navigation because `sw.js` is served `no-cache`; a hard refresh is never required.
 - QR payloads rotate (HMAC over a 30 s time slot, per-ticket seed), so a screenshot stops working within about a minute; a second scan of the same ticket returns 409 (`already`).
-- Two scanners that are BOTH offline cannot see each other's admissions: the same ticket could pass both, and the second admission comes back as a flagged conflict at sync. Assign distinct zones per gate to narrow this.
+- ~~Two offline scanners could both admit one ticket~~ — closed on 2026-10-21 by the offline entry right (below). A ticket whose right is held by a gate that is offline can be admitted only at that gate until it reconnects (or is revoked).
 - The 5-second dedup window is purely to suppress duplicate callbacks from html5-qrcode for a single physical scan. Staff rescanning the same ticket intentionally within 5s will not produce a second API call — they'll see the cached result card instead.
 
 ## See also
@@ -198,3 +198,21 @@ scanner/
 ## License
 
 Proprietary. Copyright 2024-2026 GEMBA EOOD. All rights reserved.
+
+
+---
+
+## Offline entry right (2026-10-21)
+
+Two scanners that are both offline cannot see each other. The only way one ticket can never pass twice is that, at any moment, **at most one scanner is able to admit it offline**.
+
+- **Split.** Each ticket's right (`Ticket.offlineHolderId`) belongs to one of the event's *active* scanners (synced in the last 10 min, not revoked or expired, zone allowed), by rendezvous hashing; later joins even out to a fair share.
+- **Only the holder gets the seed.** `GET /api/scanner/snapshot` (with `X-Offline-Protocol: 2`) carries `qrSeed` only for the tickets the scanner holds (`own: true`); for the others it says which gate holds them (`holder`). An old client without the header gets **no seeds** — it cannot admit anything offline. This is enforced by the server, not trusted to the app.
+- **Hand-over only with the holder's acknowledgement.** `POST /api/scanner/offline/heartbeat { released }` every 3 s while online returns `{ seq, release, stale }`: the rights the server wants back. The scanner drops them locally, **syncs any offline admit of them first**, then acknowledges in the next heartbeat; only then does the right move. `stale` = a right was handed to you, refetch the snapshot. A holder that is offline cannot acknowledge, so its tickets stay with it.
+- **Online at another gate.** `/activate` (and `/activate-manual`) of a ticket held by another scanner asks for it back and waits up to 6 s; if the holder is not reachable (no contact for 20 s) the answer is **423** with `heldBy` — *"Offline entry for this ticket is held by "Gate A" … Admit it there, wait until that scanner is back online, or — if the device is lost — revoke it in the dashboard."*
+- **Revoke frees the rights** (dashboard and admin master scanners): a revoked device is treated as gone.
+- **Stale snapshots.** `ScannerDevice.offlineSeq` goes up with every acknowledged release and each snapshot carries the `leaseSeq` it was cut at; the scanner refuses a snapshot older than its last release and keeps released tickets dropped until a newer snapshot covers them.
+- **Logging in another scanner key** on the same browser clears the old snapshot, rights and seq (pending offline decisions are kept — they record real entries).
+- The offline pill shows *"this gate can admit N of M tickets"*. The Raspberry Pi reader (`rpi-reader/reader.py`) speaks the same protocol.
+
+E2E: `tests/e2e/offline-right-e2e.js` — 45 checks, incl. a real browser in offline mode and the Pi engine.

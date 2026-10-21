@@ -2,68 +2,76 @@
 
 > `admin.gembaticket.com` — the internal panel GembaTicket operators use to observe the platform, provision access, and triage on-chain jobs. **Source is in a private repository** (`frontend/ticket-admin`); this document describes the shape and responsibilities so the public docs make sense on their own.
 
-Unlike the organizer dashboard, the admin panel is **not self-service**: only wallets on the `AdminWallet` table can reach it, and one wallet (the master) can never be removed. All auth is SIWE — there is no email/password path.
+Unlike the organizer dashboard, the admin panel is **not self-service**: only admins on the `AdminWallet` table can reach it, and one admin (the master) can never be removed. An admin signs in with the **wallet** (a signature) or — once they have set one up — with **e-mail + password**, optionally with two-factor.
 
 ---
 
-## Auth model
+## Auth model (2026-10-21)
 
-Admins sign in with **Sign-In With Ethereum (SIWE / EIP-4361)** only.
+The login page has two tabs, **Email** and **Wallet** — the same model as the GembaPay owner dashboard.
 
-```
-┌──────────────┐   GET /api/admin/auth/nonce   ┌──────────────────┐
-│  Admin SPA   │──────────────────────────────▶│  Backend API     │
-│ (wallet box) │◀── { nonce, issuedAt, ttl } ──│ (admin routes)   │
-└──────┬───────┘                               └────────┬─────────┘
-       │  wallet signs SIWE message                     │ verify sig
-       │                                                │ check allowlist
-       │  POST /api/admin/auth/verify { message, sig }  │    ↓
-       ├───────────────────────────────────────────────▶│ AdminWallet ?
-       │◀──────────── { token, wallet, isMaster } ──────│
-       ▼
- localStorage.token  →  Authorization: Bearer <JWT>
-```
+| Way in | How | Second factor |
+|---|---|---|
+| Wallet | `GET /api/admin/auth/nonce` → the wallet signs a SIWE-style message → `POST /api/admin/auth/verify` | none (the signature is the proof) |
+| E-mail | `POST /api/admin/auth/login { email, password }` | optional — chosen by the admin under **My account**: a 6-digit **code by e-mail** or an **authenticator app** (TOTP); **off by default**. With it on, the login returns a challenge and `POST /api/admin/auth/login/2fa { challengeToken, code }` finishes it. One of 8 backup codes works instead of the code, once. |
 
-- Nonce lives in Redis (5-minute TTL, single-use).
-- SIWE message is verified with `viem`'s `verifyMessage` — no server-side key rotation.
-- JWT carries `{ kind: "admin", wallet, isMaster }` and expires in 12 hours.
-- **Allowlist is DB-backed** (`AdminWallet` table). Adding or removing an admin takes effect on the next API call; no restart, no env change, no deploy.
-- `GET /api/admin/me` returns `{ wallet, isMaster }` for UI gating.
+- **Session token** `{ kind: "admin", wallet, via: "wallet"|"email", jti }`, `JWT_EXPIRES` (7 days). `POST /api/admin/auth/logout` puts the `jti` on the denylist; changing the wallet revokes the session used for it.
+- **Challenge token** (2FA, e-mail change) has its own kind (`admin-challenge`), lives 10 minutes, is **single-use** (Redis), and dies after **5 wrong codes**. It is never accepted as a session; organizer tokens are refused on the admin API and admin tokens on the organizer API. The e-mail code is carried only as an HMAC keyed with the server secret.
+- **Passwords**: at least 12 characters, bcrypt cost 12. **TOTP secret** AES-256-GCM encrypted at rest; **backup codes** stored as sha256. A TOTP code cannot be replayed within its time step.
+- **Brute force**: e-mail login 10 / 15 min per IP and **10 failures per e-mail → that e-mail locked 15 min**; 2FA codes 15 / 15 min per IP; account changes 15 / 15 min per IP; codes to a new e-mail 5 / hour. All fail closed. "No such e-mail" and "wrong password" get the same answer and cost the same time.
+- **Allowlist is DB-backed** (`AdminWallet`). Adding or removing an admin takes effect on the next API call. `GET /api/admin/me` returns `{ wallet, isMaster, via, email, twoFactorMethod }`.
+
+### My account (`/account`)
+
+| Change | Needs |
+|---|---|
+| Add / change the e-mail | the current password (once one is set) + a code sent to the **new** address |
+| Set / change the password | an e-mail first; the current password to change it |
+| Change the sign-in wallet | the current password (once set) + a signature from the **new** wallet over a server-built message; the old wallet stops working at once |
+| Two-factor: off / code by e-mail / authenticator app | e-mail + password set; the current password; the app is confirmed with a code before it is switched on; new backup codes each time |
+
+Every change is e-mailed to the admin (an e-mail change to the old and the new address). Errors on these routes are `400` — the admin client ends the session on `401`/`403`.
 
 ### The master wallet
 
-One wallet on the `AdminWallet` table carries `isMaster = true`. The default master (`0x8eB8…e298`) is **re-seeded on every API boot** — if it were accidentally deleted from the table, the next restart would restore it. This is also the wallet that cannot be removed through the UI or API. Master is currently a single-wallet role; `isMaster` is a boolean, not a set.
+One row on `AdminWallet` carries `isMaster = true` (the owner's — linked to the e-mail `ivanovslavy@gmail.com` on 2026-10-21; the password is set by the owner under My account). It cannot be removed through the UI or API.
 
 ### `AdminWallet` schema
 
 ```prisma
 model AdminWallet {
-  address         String   @id            // lowercase 0x-hex
-  label           String?
-  isMaster        Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  createdByWallet String?
+  address          String    @id          // lowercase 0x-hex — the sign-in wallet
+  label            String?
+  isMaster         Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  createdByWallet  String?
+  email            String?   @unique      // e-mail login (2026-10-21)
+  emailVerifiedAt  DateTime?
+  passwordHash     String?               // bcrypt
+  twoFactorMethod  String?               // null | "email" | "totp"
+  totpSecretEnc    String?   ; totpSecretNonce  String?
+  totpPendingEnc   String?   ; totpPendingNonce String?
+  backupCodes      String[]  @default([]) // sha256
+  updatedAt        DateTime  @updatedAt
   @@index([isMaster])
 }
 ```
 
-Migration: `prisma/migrations/20260420_admin_wallets_and_master_scanners/migration.sql` — applied on prod via `npx prisma db execute` + `npx prisma migrate resolve --applied` (prod's Postgres role cannot run `migrate dev` because of the shadow-DB restriction).
+Migrations: `20260420_admin_wallets_and_master_scanners`, `20261021_admin_email_login` — applied on prod via `npx prisma db execute` + `npx prisma migrate resolve --applied`.
 
-Seeding (`server.js → seedAdminWallets()`):
+Seeding (`server.js → seedAdminWallets()`): **only into an empty table** — `MASTER_ADMIN_WALLET` as master plus `ADMIN_WALLETS`. Afterwards the DB is the only source of truth: a removed admin stays removed and a changed wallet is not re-added on restart (until 2026-10-21 every boot upserted them back). If no row is master any more, the env master is restored as master.
 
-1. **Always** upsert the master wallet with `isMaster: true`.
-2. On first boot, read `ADMIN_WALLETS` from `.env` (comma-separated) and insert any missing rows as non-master admins.
-3. On subsequent boots, the DB is the source of truth — `.env` is ignored.
+The admin list (`GET /api/admin/admins`) never returns the password hash, TOTP secret or backup codes — only whether e-mail login and two-factor are on.
 
 ### Middleware
 
-`requireAdminAuth` (`src/middleware/auth.js`) verifies the JWT, then queries `AdminWallet.findUnique({ address })` on every request. If the row has been deleted since the JWT was issued, the request gets **403 immediately** — revoking an admin is effectively instant, bounded only by the current in-flight request.
+`requireAdminAuth` (`src/middleware/auth.js`) verifies the JWT, checks the `jti` denylist, then queries `AdminWallet.findUnique({ address })` on every request. If the row has been deleted since the JWT was issued, the request gets **403 immediately** — revoking an admin is effectively instant, bounded only by the current in-flight request.
 
 ---
 
 ## Navigation
 
-The left rail lists ten destinations. All of them require admin auth.
+The left rail lists eleven destinations. All of them require admin auth.
 
 | Path | Icon | Purpose |
 |---|---|---|
@@ -75,7 +83,8 @@ The left rail lists ten destinations. All of them require admin auth.
 | `/chain-jobs` | Cog | On-chain job queue + retry |
 | `/webhooks` | Webhook | Inbound webhook log |
 | `/monitoring` | Activity | Services, RPC, Redis, DB |
-| `/access` | KeyRound | Admin wallets + master scanner keys |
+| `/access` | KeyRound | Admins + master scanner keys |
+| `/account` | UserCog | My account — e-mail, password, wallet, two-factor |
 
 `Login.jsx` is public; every other route is wrapped in `DashboardLayout`, which rejects non-admins.
 
