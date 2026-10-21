@@ -4,8 +4,8 @@
   "chainId": 821207,
   "rpc": "https://rpc1.gembascan.io",
   "explorer": "https://testnet.gembascan.io",
-  "timestamp": "2026-06-09T00:00:00.000Z",
-  "lastVerified": "2026-07-19",
+  "timestamp": "2026-10-21T16:09:00.000Z",
+  "lastVerified": "2026-10-21",
   "deployer": "0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298",
   "note": "Contract addresses below are the CURRENT live deployment, verified on-chain against PlatformRegistry.erc721Template() / erc1155Template() at registry 0x32977E…. An earlier v3.1 snapshot of this file listed template addresses 0x791ca…/0xa0bb3…, legacy templates 0x2481…/0xEFd2…, and a standalone Claim singleton 0x32c4EF… — a chain regenesis wiped those and they now hold ZERO code. The live registry clones the two templates below; claiming is signature-based (mintSigner + relayer), so there is no standalone Claim contract in the current deployment.",
   "changes": "GASLESS relayed claiming (v3.1). The EventContract721/1155 templates include a `relayer` role (owner-changeable via setRelayer) and `claimTicketFor(recipient,[typeId,]claimHash,signature)`: the platform relayer broadcasts and pays the gas, so the holder mints the NFT for 0 GMB and only signs a free off-chain ownership message. The mintSigner signature binds the recipient, so a compromised relayer cannot redirect a mint; on-chain usedClaims[claimHash] + DB nftClaimed make double-mint impossible. The original client-pays `claimTicket` is preserved on-chain (route disabled). New events clone the ACTIVE templates below.",
@@ -16,14 +16,14 @@
       "verified": "https://testnet.gembascan.io/address/0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02#code"
     },
     "EventContract721": {
-      "address": "0x95e75771B4e066A7edAD62d8d7CbDD50307c814e",
-      "type": "template (EIP-1167) — ACTIVE, cloned by the registry",
-      "verified": "https://testnet.gembascan.io/address/0x95e75771B4e066A7edAD62d8d7CbDD50307c814e#code"
+      "address": "0x3Ba630bF309249354F25a22c2f0A3EC6b34183D8",
+      "type": "template (EIP-1167) — ACTIVE, cloned by the registry · G1-hardened · initialized (owner = cold key) so nobody else can",
+      "verified": "https://testnet.gembascan.io/address/0x3Ba630bF309249354F25a22c2f0A3EC6b34183D8#code"
     },
     "EventContract1155": {
-      "address": "0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0",
-      "type": "template (EIP-1167) — ACTIVE, cloned by the registry",
-      "verified": "https://testnet.gembascan.io/address/0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0#code"
+      "address": "0x1a7722d1292cd5eB67A05fC8B51DFDe821055cDa",
+      "type": "template (EIP-1167) — ACTIVE, cloned by the registry · G1-hardened · initialized (owner = cold key) so nobody else can",
+      "verified": "https://testnet.gembascan.io/address/0x1a7722d1292cd5eB67A05fC8B51DFDe821055cDa#code"
     }
   },
   "configuration": {
@@ -36,5 +36,23 @@
     "payments": "All payments via GembaPay (contracts are payment-agnostic); 0 platform fees",
     "gas": "Negligible — GembaBlockchain native gas ~0; relayer sponsors mint gas so holders pay/sign nothing on-chain",
     "nft": "Multi-page NFT — poster image + on-chain event details (attributes) + interactive QR page (animation_url)"
+  },
+  "previousTemplates": {
+    "EventContract721": "0x95e75771B4e066A7edAD62d8d7CbDD50307c814e",
+    "EventContract1155": "0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0",
+    "note": "Events created before 2026-10-21 16:09 UTC keep cloning these (immutable). New events clone the G1 templates."
+  },
+  "g1": {
+    "date": "2026-10-21",
+    "changes": [
+      "activateTicket rejects a never-minted tokenId (721: _requireOwned, 1155: NonexistentToken)",
+      "_recoverSigner rejects high-s (malleable) signatures — EIP-2"
+    ],
+    "txs": {
+      "EventContract721V3.initialize": "0x1666e566dca6958953485c36b29d9ef2d39aeefd7c29c7b40a6b5e493a92be6f",
+      "setTemplate(0)": "0xfc1151a7c377241a977df0ec1e3368873023dbcd51376994e57c6901d34fe84c",
+      "EventContract1155V3.initialize": "0xb9abf68f8d1ad49389cab8017f617f84a0c960ae90fddd307b00821495ef498b",
+      "setTemplate(1)": "0x0b0f04335c3fe4c3299ecdf5fadb4d6640001c26c8b78f7156874f8cd53a508d"
+    }
   }
 }
