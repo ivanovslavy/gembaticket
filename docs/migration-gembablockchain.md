@@ -23,6 +23,8 @@ from Ethereum Sepolia to **GembaBlockchain testnet** (the project's own L1).
 | EventContract721 (template) | `0x95e75771B4e066A7edAD62d8d7CbDD50307c814e` |
 | EventContract1155 (template) | `0x0b9749eE7DfCE7e1e825C8Fc7C363496ED7F75a0` |
 
+> **Superseded on 2026-10-21:** new events clone the G1-hardened templates 721V3 `0x3Ba630bF309249354F25a22c2f0A3EC6b34183D8` and 1155V3 `0x1a7722d1292cd5eB67A05fC8B51DFDe821055cDa`. The addresses above are the templates of events created before that date.
+
 Signers: platform/gas `0x8eB8Bf106EbC9834a2586D04F73866C7436Ce298`, mint signer
 `0x3418196aBeC513A95dF013751bcE036C7b27fa5a`. Full record:
 [`blockchain/deployed/gemba-latest.json`](../blockchain/deployed/gemba-latest.json).

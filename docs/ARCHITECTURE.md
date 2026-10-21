@@ -91,10 +91,11 @@ Four roles per event contract:
 
 | Role | Holder | Permissions |
 |---|---|---|
-| **Owner** | Organizer wallet | Sovereign actions (`transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`) |
+| **Owner** | The organizer's wallet if they connected one; otherwise the platform's **cold owner key** (ownership is handed over after setup) | Sovereign actions (`transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`, `setRelayer`) |
 | **Operator** | Platform signer (default) | Day-to-day ops (`increaseSupply`, `toggleSale`, `toggleTicketType`, `addTicketType`, `setTypeURI`, `updateBaseURI`). Organizer can revoke via `setOperator(0x0)` / `renounceOperator` |
-| **Platform** | Platform signer (one-time) | Initial `setupEvent` phase only; locked after |
-| **MintSigner** | Platform signer (EIP-712) | Signs off-chain claim messages for lazy mint |
+| **Platform** | Platform role key | The setup phase (locked after), `activateTicket` at the gate, and a ONE-time `cancelEvent` / `endEvent` (used by the dashboard cancel and the automatic end) |
+| **Relayer** | Relayer key | Broadcasts gasless NFT claims (`claimTicketFor`) |
+| **MintSigner** | Mint signer key (EIP-191) | Signs off-chain claim messages; never sends transactions |
 
 Details: [`CHAIN_ACTIONS.md`](./CHAIN_ACTIONS.md).
 
@@ -111,31 +112,37 @@ Each event contract is an **EIP-1167 minimal-proxy clone** of a UUPS-upgradeable
 
 ### Dashboard — deploy an event
 
-1. Organizer creates the event on the dashboard (`POST /api/events`, `POST /api/events/:id/ticket-types`).
-2. `POST /api/events/:id/deploy` → GembaPay charge (€10), orderId `deploy-{eventId}-{rand}`.
-3. Webhook `POST /webhooks/gembapay` → `handleDeployPayment` → upload metadata to IPFS, `PlatformRegistry.createEvent`, `setupEvent(ticketTypes)`, `Event.status = ACTIVE`.
+1. Organizer creates the event on the dashboard (`POST /api/events`, wall-clock times + venue zone).
+2. `POST /api/events/:id/deploy` — free while `FEES_ENABLED=false` (paid mode, dormant: a GembaPay charge `deploy-{eventId}-{ts}` first).
+3. `handleDeployPayment` (queued — one deploy at a time across the API and the chain worker) → IPFS metadata, `PlatformRegistry.createEvent` (clone of the current template), `setupEvent(ticketTypes)`, `Event.status = ACTIVE`, then the role hand-off (relayer / operator / platform keys, ownership → cold owner).
 4. Dashboard polls `GET /api/events/:id` every 5s while `DEPLOYING`.
+
+Templates since 2026-10-21: 721V3 `0x3Ba630bF309249354F25a22c2f0A3EC6b34183D8`, 1155V3 `0x1a7722d1292cd5eB67A05fC8B51DFDe821055cDa` — G1-hardened (only canonical low-s signatures; `activateTicket` refuses a never-minted token), initialized with the cold owner so nobody can take them over. Events created earlier keep their own (immutable) code.
+
+### Event lifecycle — cancel, end, refunds
+
+- **Cancel** (dashboard, 2FA): event + live tickets CANCELED in one transaction, buyers e-mailed, `cancelEvent()` on-chain; refunds automatic (one GembaPay v1 refund per order on the organizer's key, `Idempotency-Key gt-cancel-<orderId>`) or manual (organizer refunds in GembaPay; `payment.refunded` marks tickets).
+- **End**: a 60-second background tick ends every ACTIVE event whose last entry window has closed and calls `endEvent()`; the same tick drives pending refunds and retries a transient chain failure.
+- **Single refunds**: dashboard *Refund* (2FA) → partial GembaPay refund of the ticket's `pricePaid`.
 
 ### Dashboard — paid chain action
 
 See [`CHAIN_ACTIONS.md`](./CHAIN_ACTIONS.md). Full flow: estimate → GembaPay → webhook → ChainJob → receipt → (sync DB + email) or (refund + email).
 
-### Storefront — NFT claim (two-path finalization)
+### Storefront — NFT claim (gasless)
 
-The buyer's wallet submits `claimTicket(...)` directly to the event contract — the platform only *signs* the EIP-712 message. Finality is resolved by whichever of two writers lands first:
+1. The holder connects a wallet and signs a **free** ownership message (no transaction, no gas).
+2. `POST /api/claim/relay { ticketId, walletAddress, ownershipSignature, claimCode }` — the API checks the claim code and the signature, the mint signer signs `(contract, typeId?, claimHash, recipient)`, and the **relayer** broadcasts `claimTicketFor()` and pays the gas. The recipient is bound into the signature, so a relayer cannot redirect the NFT; `usedClaims[claimHash]` prevents a double mint.
+3. The `TicketClaimed` log gives the token id; `nftClaimed / tokenId / claimedWallet` are written. Canceled or refunded tickets cannot be claimed.
 
-1. `POST /api/claim/sign { ticketId, walletAddress }` → EIP-712 signature, bound to `(contractAddress, typeId?, claimHash, walletAddress)`. The backend does **not** broadcast.
-2. Wallet submits `claimTicket(...)` on-chain. The SPA uses `wagmi.useWaitForTransactionReceipt` to observe confirmation.
-3. **Fast path** — on `isConfirmed`, the SPA `POST /api/claim/confirm { ticketId, txHash }`. The API fetches the receipt via the `FallbackJsonRpcProvider` pool, parses the `TicketClaimed` log that matches `ticket.claimHash`, and writes `nftClaimed=true / tokenId / claimedWallet / claimedAt`. Idempotent.
-4. **Fallback path** — the `eventListener` worker is already subscribed to `TicketClaimed` and will write the same row if step 3 never runs (e.g. buyer closes the tab before the tx confirms, or the RPC pool is rate-limited at that instant).
-
-This is why a ticket can flip to "claimed" in seconds even under heavy GembaBlockchain RPC load — the SPA's receipt call rotates through 15 endpoints via `FallbackJsonRpcProvider` (public nodes first, keyed endpoints as last resort), and the listener independently catches up later.
+The client-pays `claimTicket` path still exists in the contract; its `/api/claim/sign` + `/confirm` routes are disabled.
 
 ### Scanner — validate at the gate
 
 1. Scanner app sends `Authorization: Bearer <scanner-JWT>` (or `X-Scanner-Key: <plain apiKey>`).
-2. `POST /api/scanner/validate { payload }` — decodes the rotating QR, checks `Ticket.status`, enforces `ScannerDevice.zones ⊇ ticket.zoneLevel`, writes `ScanLog`, enqueues `activate_ticket` ChainJob.
-3. Worker submits `EventContract.activateTicket(tokenId)`; short-circuits if already activated on-chain.
+2. `POST /api/scanner/scan` (preview) / `POST /api/scanner/activate` (admit) — verifies the rotating QR, the device's event / organizer / zone scope, the entry window, and refuses canceled or ended events and canceled / refunded / unpaid tickets; writes `ScanLog`.
+3. For a claimed NFT the activation is mirrored on-chain: an `activate_ticket` ChainJob → the worker calls `activateTicket(tokenId)` as the platform role key.
+4. Offline: the PWA validates against `GET /api/scanner/snapshot` and replays decisions via `POST /api/scanner/sync`; an admission made elsewhere meanwhile returns as a flagged conflict.
 
 ## SEO + AI discoverability
 
@@ -167,6 +174,9 @@ All read/write calls to GembaBlockchain flow through `backend/src/utils/fallback
 - **Cloudflare Turnstile** on `register` / `login` (optional).
 - **GembaPay webhooks** verified via HMAC-SHA256 over `req.rawBody` (captured in `express.json` `verify:` callback — do not strip).
 - **AES-256-GCM** for scanner key re-reveal (master key `SCANNER_KEY_SECRET` — 32-byte hex, or a passphrase stretched via SHA-256).
-- **On-chain**: EIP-712 claim signatures bind to `(tokenId, buyerAddress, eventContract)` with a mint-signer private key that is **never on the ticket-writing hot path**.
+- **On-chain**: claim signatures (EIP-191) bind `(eventContract, typeId?, claimHash, recipient)`; the mint-signer key never sends transactions. New events use the G1 templates (low-s only, no activation of unminted tokens).
+- **2FA** (email code or authenticator app) on every money- or event-changing action: date/venue edit, cancel, refunds.
+- **Deploy key**: one writer at a time (Redis lock shared by the API and the chain worker).
+- **Backups**: nightly, age-encrypted (database, service state, all IPFS pins), private key off the server, off-site copy checksum-verified, restore tested in isolation.
 
 See [`blockchain/docs/audit_solidity.md`](../blockchain/docs/audit_solidity.md) for the formal audit (Slither 0/0/0, Mythril 0/0/0, 220 functional assertions).

@@ -137,7 +137,12 @@ sudo systemctl restart gembaticket-api gembaticket-chain-worker gembaticket-list
 
 ## Backups
 
-- **PostgreSQL** — `pg_dump` nightly to `~/backups/`.
+- **Nightly encrypted backup** (`/usr/local/bin/gembaticket-backup.sh`, root cron 03:30; source in the private repo `ops/backup-tools/`):
+  - **db** — `pg_dump -Fc`; **state** — every `.env`, uploaded posters, the deployment record, Apache vhosts, systemd units, the Cloudflare origin certificate; **ipfs** — every pinned object as CAR files; plus a manifest with sha256 and exact row counts.
+  - zstd + **age** to a public key on the server; the private key is kept **off the server**, so the server can write backups but cannot read them.
+  - 14 days locally (`/var/backups/gembaticket`, root-only), 30 days off-site; the off-site copy is verified by checksum; any failure e-mails the operator.
+  - Restore drill: `ops/backup-tools/restore-test.sh` — off-site copy → sha256 → decrypt → PostgreSQL and IPFS in containers with no network → row counts, pins, event metadata and their links checked (29/29 on 2026-10-21).
+- Manual backups before a change go to `/gembaticket.com/backup/` and are encrypted the same way.
 - **Redis** — append-only persistence enabled; OTP codes are transient (10-min TTL) so no recovery needed.
 - **On-chain** — ticket ownership and event state survive any DB loss; `eventListener` re-hydrates `BlockSync`-tracked state from the chain.
 

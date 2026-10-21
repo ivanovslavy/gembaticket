@@ -172,7 +172,7 @@ All dispatches are idempotent — duplicate webhooks (retries, replays) short-ci
 
 - Service: `backend/src/services/chainActionService.js`
 - Oracle: `backend/src/services/ratesService.js`
-- Refund: `backend/src/services/paymentService.js`
+- Refund: `backend/src/services/paymentService.js` → `refundPayment` — GembaPay merchant API v1 (`POST /api/v1/refunds`, platform key with `refunds:write`, fixed body, `Idempotency-Key gt-platform-<orderId>`; a retry never refunds twice). The earlier `/api/merchant/payment-refund` endpoint never existed in GembaPay (fixed 2026-10-21).
 - Worker handler: `backend/src/workers/chainActivationWorker.js` (`runPaidChainAction`)
 - Controller: `backend/src/controllers/chainActionController.js`
 - Routes: `backend/src/routes/chainActionRoutes.js`

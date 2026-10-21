@@ -20,7 +20,7 @@ This document describes every screen the organizer sees, in the order a first-ti
 Three routes coexist on the same login card:
 
 1. **Email + password** — default. If the account has `otpLoginDisabled=false` (default), the server returns `{ otpRequired: true }` and sends a 6-digit code; UI then calls `/login-verify-otp` to exchange `(email, password, code)` for a JWT. OTP-at-login can be disabled once logged in via *Account → Security*.
-2. **Sign-In With Ethereum (SIWE)** — for organizers who have connected a wallet. `GET /api/auth/nonce` → wallet signs → `POST /api/auth/siwe { message, signature }` → JWT. SIWE bypasses OTP entirely.
+2. **Sign-In With Ethereum (SIWE)** — for organizers who have connected a wallet. `GET /api/auth/nonce` → wallet signs → `POST /api/auth/wallet-login` → JWT. SIWE bypasses OTP entirely.
 3. **Ghost-wallet login** — the dashboard never routes organizers here, but the API recognises `0x…@wallet.gembaticket.com` ghost addresses created by guest purchases and skips OTP for them so they can be upgraded later.
 
 ### Account screen
@@ -39,12 +39,11 @@ After sign-in, the landing page is `/events`.
 
 | Badge | Meaning |
 |---|---|
-| **DRAFT** | Never deployed. Editable metadata + ticket types. |
-| **PENDING_PAYMENT** | Deploy invoice issued, buyer has not paid. |
-| **DEPLOYING** | Deploy paid; awaiting IPFS upload + `createEvent` + `setupEvent` on-chain. Dashboard polls every 5s. |
-| **ACTIVE** | Contract deployed and live. Sale may or may not be toggled on. |
-| **ENDED** | `endEvent()` called on-chain. |
-| **CANCELED** | `cancelEvent()` called on-chain. Refunds flow automatically. |
+| **Created** (`PENDING_PAYMENT`) | Saved, not deployed yet. Deploy is free while fees are off; the name is historical. |
+| **DEPLOYING** | IPFS upload + `createEvent` + `setupEvent` + role hand-off on-chain. Deploys are queued one at a time. Dashboard polls every 5s. |
+| **ACTIVE** | Contract deployed and live. Sale may or may not be toggled on. Shows when it will end on its own. |
+| **ENDED** | Ended **automatically** once the last entry window closed (`endEvent()` on-chain). Sales and the gate are closed. |
+| **CANCELED** | Canceled by the organizer (§11). Tickets void, buyers e-mailed, refunds automatic or manual as chosen. |
 
 A `+ New event` button opens the creator wizard.
 
@@ -52,14 +51,11 @@ A `+ New event` button opens the creator wizard.
 
 ## 3. Create event (wizard)
 
-Four steps on the same page, no navigation between them:
+Three steps on the same page:
 
-1. **Basics** — name, description, venue, address, starts/ends, banner image (uploaded to backend, served from the storefront).
-2. **Contract type** — `ERC721` (single supply) or `ERC1155` (multiple ticket types with different supplies). Locked after save.
-3. **Ticket types**
-   - ERC-721: one implicit type with `maxSupply` + `priceEur`.
-   - ERC-1155: add N types, each with `name`, `maxSupply`, `priceEur`, `zoneLevel` (linked to Zone, see §5).
-4. **Publish** — `POST /api/events` creates the `DRAFT`. `PATCH /api/events/:id` updates it.
+1. **Event info** — name, description, venue, date & time, the venue's **time zone**, poster image (the NFT artwork), contract type (`ERC721` single supply / `ERC1155` several ticket types, locked after save).
+2. **Ticket types** — name, price, supply, zone, and the **entry window** (valid from / until) each type is admitted in.
+3. **Review & create** — `POST /api/events` (multipart). Every time is sent as the venue's wall-clock plus the zone; the server converts it (`toInstant`). An organizer abroad still types venue time.
 
 Saving returns to the event detail page.
 
@@ -67,36 +63,28 @@ Saving returns to the event detail page.
 
 ## 4. Event detail page (pre-deploy)
 
-Visible while `status=DRAFT` or `PENDING_PAYMENT`:
+Visible while `status=PENDING_PAYMENT` (shown as *Created*):
 
-- **Metadata card** — editable name / dates / venue / banner.
-- **Ticket types card** — add / edit / remove types (free while DRAFT).
-- **Zones card** — see §5. Can be defined pre- or post-deploy.
-- **Deploy button** — opens the deploy modal.
+- **Event details** — date, time, venue (changes are 2FA-confirmed, see §6).
+- **Ticket types** and **Zones** (§5).
+- **Deploy Event** button.
 
-### Deploy payment (€10)
+### Deploy
+
+`POST /api/events/:id/deploy` — free while `FEES_ENABLED=false` (returns `{ free: true, deploying: true }`); the backend deploys directly:
 
 ```
-POST /api/events/:id/deploy
-      │
-      ▼
-  GembaPay charge (€10, orderId "deploy-{eventId}-{rand}")
-      │ returns { paymentUrl, orderId }
-      ▼
-  dashboard opens paymentUrl in a new tab
-      │
-      ▼ buyer pays → webhook fires
-  handleDeployPayment:
-    1. upload event metadata → IPFS, note the CID
-    2. PlatformRegistry.createEvent(...)        → clone address
-    3. EventContract.setupEvent(ticketTypes)    → locks platform role
-    4. Event.status = ACTIVE, contractAddress, ipfsHash saved
-      │
-      ▼
-  dashboard polls GET /api/events/:id every 5s until ACTIVE
+handleDeployPayment (one at a time — Redis lock on the deploy key, shared with the chain worker):
+  1. upload event metadata → IPFS
+  2. PlatformRegistry.createEvent(...)        → clone of the current template
+  3. setupEvent(ticketTypes)                   → locks the platform setup phase
+  4. Event.status = ACTIVE, contractAddress saved
+  5. role hand-off: relayer / operator / platform keys, ownership → cold owner key
 ```
 
-If a deploy already has a paid invoice attached, the endpoint returns `{ retry: true }` and the dashboard re-polls instead of double-charging.
+The dashboard polls `GET /api/events/:id` every 5s until ACTIVE. A stalled or failed deploy is resumed onto the same clone by the chain worker.
+
+**Paid mode (dormant, `FEES_ENABLED=true`):** the endpoint first creates a GembaPay charge (`orderId "deploy-…"`, default €10) and deploys on `payment.completed`. A paid deploy that fails 3 times is **refunded** automatically and the organizer notified.
 
 ---
 
@@ -163,7 +151,7 @@ Still routed through the payment modal for UX consistency — the modal short-ci
 
 ### 6c. Sale toggle
 
-A single button on the event header → `toggleSale({})`. Paid (gas + €5). This is the most-used chain action; it flips `Event.saleActive` both on-chain and (after receipt) in Prisma.
+A single button on the event header → `toggleSale({})`. Free while fees are off (paid mode, dormant: gas + €5). This is the most-used chain action; it flips `Event.saleActive` both on-chain and (after receipt) in Prisma.
 
 ### 6d. ActionHistory
 
@@ -184,6 +172,8 @@ In-flight rows (`AWAITING_PAYMENT`, `PAID`, `SUBMITTED`) are polled every ~6s un
 ---
 
 ## 7. Chain-action payment modal
+
+> Fees are currently **off** (`FEES_ENABLED=false`): every action is free and the modal skips payment. The paid flow below is dormant; when it is on, a reverted paid action is refunded through GembaPay's refunds API.
 
 `ChainActionPaymentModal.jsx` is the single UI everything routes through. Two steps:
 
@@ -248,16 +238,17 @@ Scanner devices authenticate gate staff against `/api/scanner/*`. From the dashb
 
 `POST /api/dashboard/scanners/:id/reveal` decrypts the ciphertext, writes a `ScanLog { action: "reveal" }` for audit, and returns the plain key. The master AES key is `SCANNER_KEY_SECRET` (32-byte hex), held only in backend env.
 
-### Edit / revoke
+### Logs / revoke
 
-`PATCH /api/dashboard/scanners/:id` updates label / zones / validity window. `DELETE /api/dashboard/scanners/:id` sets `revokedAt=now()` — the hot-path check refuses revoked devices immediately.
+`GET /api/dashboard/scanners/:id/logs` shows the device's scans. `DELETE /api/dashboard/scanners/:id` sets `revokedAt=now()` — the hot-path check refuses revoked devices immediately. To change a device's zones, revoke it and create a new one.
 
 ### How staff use it
 
 1. The organizer sends the plain `apiKey` to the gate operator.
 2. Operator opens `scanner.gembaticket.com`, pastes the key → PWA stores it in IndexedDB.
 3. `POST /api/scanner/auth { apiKey }` → short-lived scanner-JWT bound to the device.
-4. QR scans call `/api/scanner/validate` with the JWT; offline scans buffer in a Dexie outbox and sync when online.
+4. Scans call `/api/scanner/scan` (preview) and `/api/scanner/activate` (admit). With no network the PWA validates against its **offline snapshot** (`/api/scanner/snapshot`) and replays its door decisions via `/api/scanner/sync` when the network returns; a ticket admitted elsewhere in the meantime comes back as a flagged *conflict*.
+5. Canceled or ended events and canceled / refunded tickets are refused at the gate (online, and offline after the next snapshot).
 
 ---
 
@@ -271,21 +262,26 @@ Scanner devices authenticate gate staff against `/api/scanner/*`. From the dashb
 | Status | PENDING_PAYMENT / PAID / MINTING / MINTED / CLAIMED / ACTIVATED / CANCELED / REFUNDED |
 | Buyer | email, wallet (if claimed) |
 | Type / Zone | ticket type + zone chip |
-| Paid | amount + GembaPay order link |
-| Links | `/ticket/:id` public view, Etherscan token link (if minted) |
+| Paid | price actually paid (+ the discount code, if any) |
+| Refund | **Refund** button for a paid, not-yet-refunded ticket (§11) |
 
-Search is substring on email / ticket number.
+Search is substring on email / claim code. **Export CSV** downloads every ticket of the event (`GET /api/dashboard/events/:id/tickets.csv`): type, zone, buyer, list price, discount code, discount, paid, NFT claim, purchase / scan / cancel / refund times in the venue's zone, refund status. Abandoned checkouts are left out.
+
+### Discount codes
+
+The **Discount codes** card on the event page: create a code (e.g. `EARLY20`) — percent 1–99 or a fixed amount off each ticket, for all or selected paid ticket types, an optional limit (counted in tickets) and an expiry (venue time). Each code shows its uses (`used 3 / 3`). A code can be switched off at any time; an unused code can be deleted, a used one only switched off. Buyers see a *Discount code* field only while the event has an active code; the price is always recomputed on the server, inside the purchase transaction. Free entry stays with promo tickets — a code cannot bring a ticket below 0.50.
 
 ---
 
-## 11. Ending / cancelling an event
+## 11. Ending, cancelling and refunds
 
-Two owner-only chain actions that the dashboard currently exposes only via a *Danger zone* card (not yet in the ChainActionPaymentModal flow — they're signed by the organizer wallet, not the operator):
+- **End** — automatic. When the last entry window of the event closes (a ticket type without a window counts the event date + 24 h), a background job marks the event ENDED and calls `endEvent()` on-chain. Sales and the gate close; holders keep their NFTs. The event page shows *Ends automatically …* while it is live.
+- **Cancel** — *Cancel event* button (2FA). The organizer chooses:
+  - **automatic refunds** — every paid order is refunded in full from the organizer's own GembaPay account (`POST /api/v1/refunds`, idempotent per order). The organizer's GembaPay API key needs the **`refunds:write`** permission; otherwise the banner explains it and offers **Retry refunds**;
+  - **manual refunds** — buyers are told the organizer will refund them; with GembaPay's `payment.refunded` webhook switched on, each full refund made in GembaPay marks the tickets refunded. **Refund everyone now** switches to automatic later.
 
-- **End event** — `endEvent()`. Prevents further claims/activations. Leaves minted NFTs intact.
-- **Cancel event** — `cancelEvent()`. Marks the contract as cancelled; Prisma triggers automatic refunds for PAID tickets via GembaPay.
-
-These require an organizer wallet holding enough GMB to pay gas themselves. If the operator has already been revoked, every chain write falls into this category — the dashboard surfaces a banner explaining so.
+  Every ticket is voided, every buyer e-mailed (with the organizer's message), the contract marked canceled (`cancelEvent()` by the platform role key, once per contract). A payment that arrives after the cancel is refunded too.
+- **Refund one ticket** — the *Refund* button in the tickets table (2FA): the price paid for that ticket, from the organizer's GembaPay account; the buyer is e-mailed and the gate refuses the ticket. Works on live and canceled events.
 
 ---
 
@@ -296,7 +292,7 @@ These require an organizer wallet holding enough GMB to pay gas themselves. If t
 | `/api/auth/*` | 20/min per IP |
 | OTP send | 5/min per IP, 30s cooldown per email |
 | Ticket `/buy` | 10/min per IP (matters for ops testing) |
-| Scanner `/validate` | 120/min per scanner |
+| Scanner `/scan`, `/activate` | 120/min per scanner |
 
 Chain-action endpoints inherit the auth limit only (no separate gate — GembaPay is the economic brake).
 

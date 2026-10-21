@@ -7,6 +7,10 @@ Auth: `Authorization: Bearer <JWT>` unless noted "public". Scanner endpoints acc
 
 Response convention: `200 OK { … }` on success, `4xx { error: string }` on client error, `5xx { error: string }` on server error. `429` on rate limits.
 
+Times: every date/time an organizer sends (event date, ticket-type sale and entry windows, discount-code validity) may be the venue's **wall-clock** (`"2026-12-01T18:00"`), read in the event's IANA time zone (`Event.timezone`); an ISO string with an offset is taken as-is. Instants are stored in UTC.
+
+*Reference re-checked against the route files on 2026-10-21.*
+
 ---
 
 ## Auth (`/api/auth`)
@@ -15,102 +19,97 @@ Response convention: `200 OK { … }` on success, `4xx { error: string }` on cli
 |---|---|---|---|---|
 | POST | `/register` | `{ email, password, name, company?, wallet?, turnstileToken? }` | public | Validates + emails OTP. Returns `{ otpRequired: true, email }`. No DB row written yet. |
 | POST | `/register-verify-otp` | `{ email, password, name, company?, wallet?, phone?, code }` | public | Verifies OTP, creates organizer with `verified=true`, returns `{ token, organizer }`. |
-| POST | `/login` | `{ email, password, turnstileToken? }` | public | Returns `{ token, organizer }` **or** `{ otpRequired: true }` if OTP-at-login is enabled (default). |
+| POST | `/login` | `{ email, password, turnstileToken? }` | public | Returns `{ token, organizer }`, `{ otpRequired: true }` (email code) or `{ totpRequired: true }` (authenticator app). |
 | POST | `/login-verify-otp` | `{ email, password, code }` | public | Returns `{ token, organizer }`. |
+| POST | `/login-verify-totp` | `{ email, password, code }` | public | Returns `{ token, organizer }`. |
 | POST | `/purchase-otp/send` | `{ email, eventId, ticketTypeId, quantity }` | public | Sends 6-digit code with event context (name, venue, date, type, qty). |
 | POST | `/purchase-otp/verify` | `{ email, code }` | public | Returns opaque `{ token }` (15-min TTL, not a JWT). |
-| POST | `/otp-login-pref` | `{ disabled: boolean }` | JWT | Toggles OTP-at-login for the current account. |
-| GET  | `/me` | — | JWT | Returns `{ organizer }` including `otpLoginDisabled`. |
-| GET  | `/nonce` | — | public | SIWE nonce. |
-| POST | `/siwe` | `{ message, signature }` | public | Returns `{ token, organizer }`. |
-
-Ghost-wallet emails (`/^0x[0-9a-f]+@wallet\.gembaticket\.com$/i`) skip OTP-at-login.
+| GET  | `/nonce` · POST `/wallet-login` | — | public | Sign-in with a wallet (SIWE). |
+| GET  | `/me` | — | JWT | Current account incl. the derived `twoFactorMethod` (`email` / `totp` / `none`). |
+| POST | `/logout` | — | JWT | Revokes the token (denylist). |
+| PUT  | `/profile` · POST `/link-wallet` · `/unlink-wallet` · `/link-email` | — | JWT | Profile and identity links. |
+| POST | `/2fa/method` · `/2fa/totp/setup` · `/2fa/totp/enable` · `/otp-login-pref` | — | JWT | Login second factor. |
 
 ## Events (`/api/events`)
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET  | `/` | public | List published events. |
-| GET  | `/:id` | public | Detail + ticket types + on-chain info (if deployed). |
-| POST | `/` | JWT | Create event (organizer). |
-| PATCH | `/:id` | JWT | Update event metadata. |
-| POST | `/:id/deploy` | JWT | Creates GembaPay charge (€10). Returns `{ paymentUrl, orderId }` or `{ retry: true }` if already paid. |
+| GET  | `/` | public | Active events (organizers also see their own). |
+| GET  | `/:id` | public | Detail, ticket types with sale gates, stats, `endsAt` (when the event ends on its own), `hasDiscountCodes`. The organizer additionally gets `refunds` (refund progress after a cancel). |
+| POST | `/` | JWT | Create event (multipart, optional poster). Wall-clock times + `timezone`. Requires a connected GembaPay account. |
+| POST | `/:id/deploy` | JWT | Deploys the event contract. Free while fees are off (`FEES_ENABLED=false`): returns `{ free: true, deploying: true }`. Deploys are queued one at a time. |
+| POST | `/:id/edit/request-otp` | JWT | Starts the 2FA confirmation for a date/venue change. |
+| PATCH | `/:id` | JWT | `{ eventDate, timezone?, venue, code }` — 2FA-confirmed date/time/venue change; `eventDate` is venue wall-clock in `timezone` (default: the event's zone). |
+| POST | `/:id/share-promo` · `/:id/promo-type` | JWT | Send free promo tickets / add promo supply. |
 
 ## Tickets (`/api/tickets`)
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/buy` | JWT optional | Body: `{ eventId, ticketTypeId, quantity, email?, otpToken? }`. `otpToken` required iff no JWT. Returns `{ paymentUrl, ticketId }`. |
-| GET  | `/:id` | public | Public ticket view (rotating QR). |
+| POST | `/buy` | JWT optional | `{ eventId, ticketTypeId, quantity, buyerEmail?, otpToken?, discountCode? }`. `otpToken` required iff no JWT. A discount code is checked inside the purchase transaction. Returns `{ ticketIds, paymentUrl, total, currency, discount }`. |
+| POST | `/discount/check` | public (20/min per IP) | `{ eventId, ticketTypeId, quantity, code }` → price preview `{ valid, unitPrice, unitDiscount, total, totalBefore }` or `400 { valid: false, error }`. |
+| GET  | `/:id` · `/by-token/:token` | public | Ticket view (rotating QR). |
 | GET  | `/my` | JWT | Current user's tickets. |
 | GET  | `/event/:eventId` | JWT | Organizer view — tickets for their event. |
 
-NFT claim is a dedicated namespace — see `/api/claim` below. There is no `POST /tickets/:id/claim`.
+## Dashboard (`/api/dashboard`, JWT, own events only)
 
-## Dashboard — events (`/api/dashboard/events`)
+| Method | Path | Notes |
+|---|---|---|
+| GET  | `/stats` · `/events` · `/events/:id` | Overview, organizer's events, one event with stats (revenue = price actually paid). |
+| PUT  | `/events/:id` | Name / description / image (date and venue go through the 2FA route above). |
+| GET  | `/events/:id/tickets` | Paginated tickets (`?limit`, `?status`, `?search`), incl. `pricePaid` and the discount code. |
+| GET  | `/events/:id/tickets.csv` | **CSV export** of every ticket: type, zone, buyer, list price, code, discount, paid, NFT claim, purchase / scan / cancel / refund times (venue zone), refund status. UTF-8 with BOM. |
+| GET / POST | `/events/:id/discount-codes` | List / create a **discount code** `{ code, kind: "percent"\|"fixed", value, ticketTypeIds?, maxUses?, validFrom?, validUntil? }` (percent 1–99; the price may not fall below 0.50). |
+| PATCH / DELETE | `/discount-codes/:id` | Switch on/off, change limits; delete only an unused code. |
+| POST | `/events/:id/cancel/request-otp` · `/events/:id/cancel` | **Cancel the event** `{ refundMode: "auto"\|"manual", reason?, code }` (2FA). Voids every ticket, e-mails buyers, marks the contract canceled; `auto` refunds every paid order through the organizer's GembaPay key (needs `refunds:write`). |
+| POST | `/events/:id/refunds/retry` | Retry failed automatic refunds. |
+| POST | `/refunds/request-otp` · `/tickets/:id/refund` | **Refund one ticket** `{ code }` (2FA) — the price paid, from the organizer's GembaPay account; the buyer is e-mailed, the gate refuses the ticket. |
+| POST | `/events/:id/refunds/refund-all` | `{ code }` (2FA) — a canceled event with manual refunds: refund every buyer now. |
+| PATCH | `/ticket-types/:id/schedule` | Sale window, unlock rules, sort order, entry window (venue wall-clock). |
+| GET / PUT | `/payment-connection` | The organizer's GembaPay API key + webhook secret (stored encrypted). |
+| GET / POST / PUT | `/notifications`, `/notifications/read`, `/notifications/prefs` | In-app notifications (incl. `event_canceled`, `event_ended`, `refund_failed`). |
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET  | `/` | JWT | Organizer's events. |
-| GET  | `/:id/tickets` | JWT | Paginated tickets for an event (`?limit`, `?status`, `?search`). |
+## Dashboard — zones, scanners, chain actions
 
-## Dashboard — zones (`/api/dashboard`)
-
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET  | `/events/:eventId/zones` | JWT | List zones for an event. |
-| POST | `/events/:eventId/zones` | JWT | `{ name, color?, level }`. |
-| PUT  | `/zones/:id` | JWT | Update. |
-| DELETE | `/zones/:id` | JWT | Remove. |
-
-## Dashboard — scanners (`/api/dashboard/scanners`)
-
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET  | `/` | JWT | Organizer's scanners. |
-| POST | `/` | JWT | `{ eventId?, label, zones?, activeFrom?, activeUntil? }`. Returns plain apiKey **once**. |
-| POST | `/:id/reveal` | JWT | Re-reveal plain key from AES-GCM ciphertext; writes `ScanLog { action: "reveal" }`. |
-| PATCH | `/:id` | JWT | Update label/zones/validity window. |
-| DELETE | `/:id` | JWT | Revoke (`revokedAt = now()`). |
-
-## Dashboard — chain actions (`/api/dashboard`)
-
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET  | `/events/:eventId/actions` | JWT | Last 100 `ChainAction` rows for an event. |
-| POST | `/events/:eventId/actions/estimate` | JWT | Body: `{ fn, args }`. Returns `{ fn, paid, gasUnits, gasEth, gasEur, feeEur, totalEur, eurPerEth }`. |
-| POST | `/events/:eventId/actions` | JWT | Body: `{ fn, args }`. Returns `{ action, paymentUrl, estimate }`. `paymentUrl` is `null` for free actions. |
-| GET  | `/actions/:id` | JWT | Single action with current status. |
-| POST | `/actions/:id/retry` | JWT | Free retry of a REVERTED / REFUNDED action. |
-
-Supported `fn` values: `increaseSupply`, `increaseTypeSupply`, `addTicketType`, `toggleTicketType`, `toggleSale`, `setOperator`, `renounceOperator`. See [`CHAIN_ACTIONS.md`](./CHAIN_ACTIONS.md) for the full args contract.
+| Method | Path | Notes |
+|---|---|---|
+| GET / POST | `/api/dashboard/events/:eventId/zones` | List / create `{ name, color?, level }`. |
+| PUT / DELETE | `/api/dashboard/zones/:id` | Update / remove. |
+| GET / POST | `/api/dashboard/scanners` | Organizer's scanners / create `{ eventId?, label, zones?, activeUntil? }` — plain key returned **once**. |
+| POST | `/api/dashboard/scanners/:id/reveal` | Re-reveal the key from its AES-GCM copy; audit-logged. |
+| GET | `/api/dashboard/scanners/:id/logs` | Scan log. |
+| DELETE | `/api/dashboard/scanners/:id` | Revoke. |
+| GET | `/api/dashboard/events/:eventId/actions` | Last 100 chain actions. |
+| POST | `/api/dashboard/events/:eventId/actions/estimate` · `/actions` | `{ fn, args }` — on-chain changes (supply, ticket types, sale toggle, operator). Free while fees are off. |
+| GET / POST | `/api/dashboard/actions/:id` · `/actions/:id/retry` | Status / free retry of a reverted or refunded action. |
 
 ## Scanner (`/api/scanner`)
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | POST | `/auth` | scanner-key | Exchange `{ apiKey }` for a short-lived scanner-JWT + scanner/event context. |
-| GET  | `/whoami` | scanner | Returns current scanner + event + zones. |
-| POST | `/validate` | scanner | `{ payload }` — decodes rotating QR, enforces zone, writes `ScanLog`, enqueues activation. |
-| POST | `/manual` | scanner | Manual claim-code entry fallback. |
+| GET  | `/me` | scanner | Current scanner + event + zones. |
+| POST | `/scan` | scanner | `{ payload }` — read-only check of the rotating QR. `403 { valid: false, reason }` for a wrong event/zone, outside the entry window, a canceled or ended event, or a canceled / refunded / unpaid ticket. |
+| POST | `/activate` | scanner | Admit + burn (same checks). `409` on a second activation. The on-chain `activateTicket` follows asynchronously (chain worker) for claimed NFTs. |
+| POST | `/activate-manual` | scanner | Admit by ticket id when the QR cannot be read. |
+| GET  | `/snapshot` | scanner | Offline mode: active events + valid tickets (per-ticket QR seeds), ETag'd. |
+| POST | `/sync` | scanner | Replay offline door decisions (idempotent per `clientId`; `conflict` = another scanner admitted it first). |
 
 ## Claim (`/api/claim`)
 
-The claim flow is three endpoints. The buyer's wallet submits `claimTicket(...)` directly to the event contract — the backend only *signs* the EIP-712 message, it never pays gas. Once the SPA sees `isConfirmed`, it POSTs `/confirm` so the UI flips to "claimed" without waiting for the block listener.
-
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/sign` | JWT | Body: `{ ticketId, walletAddress }`. Returns `{ signature, claimHash, contractAddress, eventType, typeId }`. Validates ticket ownership, event state, and that the NFT is not already claimed, then returns an EIP-712 signature for the buyer wallet to submit on-chain. |
-| POST | `/confirm` | public | Body: `{ ticketId, txHash }`. Reads the transaction receipt, parses the `TicketClaimed` log matching the ticket's `claimHash`, and marks `nftClaimed=true / tokenId / claimedWallet / claimedAt` in the DB. Idempotent — if already claimed, returns the current state. Returns `409` if the tx is not yet confirmed. |
-| GET  | `/status/:ticketId` | public | Returns `{ ticketId, nftClaimed, claimedWallet, tokenId, claimedAt, contractAddress }`. |
+| POST | `/relay` | JWT | `{ ticketId, walletAddress, ownershipSignature, claimCode }` — gasless NFT claim: the holder signs a free message, the platform relayer mints (`claimTicketFor`). Refused for canceled / refunded tickets and canceled events. |
+| GET  | `/status/:ticketId` | public | `{ nftClaimed, claimedWallet, tokenId, claimedAt, contractAddress }`. |
 
-The on-chain `eventListener` worker also watches `TicketClaimed` and writes the same row — `/confirm` is the *fast path*, the listener is the *fallback* for cases where the SPA tab is closed before the receipt arrives.
+The original client-pays `/sign` + `/confirm` routes are disabled (kept in the code).
 
 ## Webhooks (`/webhooks`)
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/gembapay` | HMAC-SHA256 header | Handles `payment.completed`. Dispatches by orderId prefix: `deploy-*` (event deploy), `ticket-*` (ticket purchase), `action-*` (paid chain action). Raw body required for signature verification. |
+| POST | `/gembapay` | HMAC-SHA256 header | `payment.completed` dispatched by orderId prefix: `deploy-*`, `ticket-*`, `action-*`. `payment.refunded` for `ticket-*`: a full refund marks the order's tickets REFUNDED; a single-ticket refund is matched by its refund id. A ticket order paid after its event was canceled is queued for refund. Signed with the organizer's webhook secret (ticket orders) or the platform secret. |
 
 ## Health
 
@@ -122,7 +121,9 @@ The on-chain `eventListener` worker also watches `TicketClaimed` and writes the 
 
 | Group | Limit |
 |---|---|
-| Auth endpoints | 20/min per IP |
-| OTP send | 5/min per IP + 30s cooldown per email |
-| Ticket buy | 10/min per IP |
-| Scanner validate | 120/min per scanner |
+| Auth / OTP endpoints | 10/min per IP (fail-closed) + 30s resend cooldown per email |
+| Public reads (`/api/events`, `/api/tickets`) | 120/min per IP |
+| Discount-code check | 20/min per IP (fail-closed) |
+| Deploy and chain actions | 5/min, 50/h, 200/day per IP and per organizer |
+| Scanner | 120/min per scanner; `/auth` 10/min |
+| Webhooks | 100/min |

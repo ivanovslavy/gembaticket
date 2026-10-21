@@ -10,7 +10,7 @@ A staff-facing Progressive Web App for validating GembaTicket NFT tickets at the
 
 The scanner is installed as a PWA on gate-staff phones. It opens the back camera, continuously decodes QR codes from GembaTicket NFT tickets, and posts each decoded payload to the `/activate` endpoint on the ticket backend. Each scan produces a full-screen colour flash, a beep, and a result card so staff can work quickly in noisy, bright gate conditions without reading text.
 
-The app is designed for the realities of event gates: flaky mobile data, cheap phones with slow autofocus, and staff who cannot stop to tap the screen between every scan. It scans continuously without pausing, auto-dismisses result cards on a kind-specific timeout, and queues scans offline when the backend is unreachable — replaying them automatically when connectivity returns.
+The app is designed for the realities of event gates: flaky mobile data, cheap phones with slow autofocus, and staff who cannot stop to tap the screen between every scan. It scans continuously without pausing, auto-dismisses result cards on a kind-specific timeout, and **keeps admitting with no network**: it validates the rotating QR against a local snapshot of the event's valid tickets and replays its door decisions when connectivity returns.
 
 ## Architecture
 
@@ -18,18 +18,18 @@ The app is designed for the realities of event gates: flaky mobile data, cheap p
 Staff phone (PWA)
   |
   |-- QRReader (html5-qrcode + native BarcodeDetector when available)
-  |-- Scan page (activation logic, offline outbox, feedback)
-  |-- IndexedDB (Dexie) — history + offline outbox
+  |-- Scan page (activation logic, feedback)
+  |-- offline engine (src/offline/offline.js)
+  |-- IndexedDB (Dexie) — history, offline snapshot, queued decisions
   v
-scanner.gembaticket.com (Apache proxy, port 3087)
-  |
-  v
-`serve -s dist -l 3087`  (static Vite build)
+scanner.gembaticket.com (Apache proxy → 127.0.0.1:3107, static Vite build)
 
-On decode:
-  payload --> POST /activate --> ticket backend --> ok | already | denied
-                     |
-                     `-- network failure --> IndexedDB outbox --> replay on reconnect
+On decode (online):
+  payload --> POST /api/scanner/activate --> ok | already | refused (reason)
+On decode (offline):
+  payload --> verify the v2 QR against the local snapshot (per-ticket seed, zone, entry window)
+          --> ok / already locally --> decision queued --> POST /api/scanner/sync on reconnect
+While online: GET /api/scanner/snapshot every 60 s (ETag, 304 when unchanged)
 ```
 
 ## Features
@@ -37,8 +37,8 @@ On decode:
 - **Continuous scanning:** camera never pauses; decode loop runs at 25 fps with native `BarcodeDetector` when supported (Chrome on Android)
 - **Four distinct ticket states:** `ok` (green), `already` (amber), `queued` (blue, offline), `error` (red) — each with its own flash colour, card colour, icon, and beep pitch
 - **Auto-dismiss result card:** 1.5s for `ok`, 2s for `already`, 2.5s for `queued`, 3.5s for `error` — no tap required between scans
-- **Deduplication:** same payload is ignored for 5s after a decode — this guards against html5-qrcode firing its callback multiple times for a single physical scan, not against replay of the QR itself (GembaTicket QR payloads are static, baked into the ticket PNG at mint time)
-- **Offline queue:** failed activations are stored in IndexedDB via Dexie and replayed automatically when the browser reports `online`
+- **Deduplication:** same payload is ignored for 5s after a decode — this guards against html5-qrcode firing its callback multiple times for a single physical scan. Replay of the QR itself is stopped by the ticket side: the QR is HMAC-signed and rotates every 30 s, so a screenshot expires within about a minute
+- **Offline mode:** a local snapshot of the event's valid tickets (active events only — canceled, refunded and ended are left out) lets the scanner validate and admit with no network; each admission is queued as a decision and replayed idempotently via `/api/scanner/sync`. A ticket that another scanner admitted meanwhile comes back as a flagged **conflict**
 - **Scan history:** local history page with outcomes for post-event audit
 - **Manual entry:** fallback page for typing a ticket code when the camera cannot read it
 - **Hardware-aware camera:** requests 1920×1080 @ 30 fps, applies continuous autofocus / exposure / white-balance when the device exposes those capabilities
@@ -56,7 +56,7 @@ On decode:
 | Storage   | Dexie 4 (IndexedDB wrapper)                 |
 | PWA       | vite-plugin-pwa 0.21 (Workbox generateSW)   |
 | Icons     | lucide-react                                |
-| Serve     | `serve` (static) on port 3087               |
+| Serve     | `serve` (static) on port 3107               |
 | Proxy     | Apache + Cloudflare DNS/SSL                 |
 
 ## Ticket States
@@ -67,8 +67,8 @@ Each decoded QR resolves to one of four states. The flash overlay, card backgrou
 |-----------|--------|------------------------------------------------------------------|--------------|
 | `ok`      | green  | Valid activation; ticket consumed                                | 1.5s         |
 | `already` | amber  | Backend returned 409 — ticket was activated earlier              | 2.0s         |
-| `queued`  | blue   | Network error — payload saved to IndexedDB, will retry online    | 2.5s         |
-| `error`   | red    | 400/401/403/404, explicit `success: false`, or camera failure    | 3.5s         |
+| `queued`  | blue   | Admitted OFFLINE from the local snapshot; the decision syncs online | 2.5s       |
+| `error`   | red    | Refused — wrong event/zone, outside the entry window, event canceled or ended, ticket canceled/refunded — or a camera failure | 3.5s |
 
 ## Routes
 
@@ -113,8 +113,8 @@ Fixed header with event name, scanner label, online/offline indicator, and links
 4. `Scan.jsx` guards with `inflightRef` — at most one activation call is in flight at a time.
 5. On successful HTTP response, `showResult` sets card state + flash + beep + vibration; an effect schedules auto-dismiss.
 6. On HTTP error with `status ∈ {400,401,403,404}` or `409`, the kind is `error` or `already`.
-7. On any other error (typically network), the payload is appended to the Dexie outbox and the kind is `queued`.
-8. When `navigator.onLine` flips to true, an effect walks the outbox and re-posts each item, removing entries that succeed.
+7. On a network error the scan is decided OFFLINE against the snapshot (`offlineActivate`): a valid v2 QR is admitted locally (a second offline scan of it → `already`) and the decision is queued; the kind is `queued`.
+8. While online, the app refreshes the snapshot and flushes queued decisions (`/api/scanner/sync`, idempotent per `clientId`; `conflict` = admitted elsewhere first).
 
 ## Configuration
 
@@ -126,7 +126,7 @@ VITE_API_BASE=https://api.gembaticket.com
 
 Additional runtime config lives in `src/config/api.js` (endpoint paths, auth header construction).
 
-Apache proxy (`scanner.gembaticket.com-ssl.conf`) forwards 443 to local port 3087 and sets:
+Apache proxy (`scanner.gembaticket.com-ssl.conf`) forwards 443 to local port 3107 and sets:
 - `Permissions-Policy: camera=(self)` — required for back-camera access on mobile
 - `Cache-Control: no-cache, no-store, must-revalidate` on `sw.js` / `registerSW.js` / `workbox-*.js` so service worker updates propagate immediately
 
@@ -137,7 +137,7 @@ cd scanner/
 npm install
 cp .env.example .env   # set VITE_API_BASE
 npm run build
-npm run serve          # serves dist/ on port 3087
+npm run serve          # serves dist/ on port 3107
 ```
 
 For local development:
@@ -146,7 +146,7 @@ For local development:
 npm run dev            # Vite dev server with HMR
 ```
 
-The production deploy path is `serve -s dist -l 3087`; Apache fronts it on 443.
+The production deploy path is `serve -s dist -l tcp://127.0.0.1:3107`; Apache fronts it on 443.
 
 ## Project Structure
 
@@ -168,13 +168,13 @@ scanner/
       StatusBar.jsx             # Header: event, online state, nav links
     pages/
       Login.jsx                 # Operator login
-      Scan.jsx                  # Main scan flow, activation, offline outbox
+      Scan.jsx                  # Main scan flow, activation, offline decisions
       Manual.jsx                # Keyboard fallback
       History.jsx               # Local scan history
     config/
       api.js                    # Base URL, endpoints, fetch wrapper (throws {status,body})
     db/
-      db.js                     # Dexie schema: history + outbox tables
+      db.js                     # Dexie schema: history, offline snapshot, queued decisions (+ the legacy outbox, drained once)
     store/
       useScannerStore.js        # Zustand: token, event, scanner, online
 ```
@@ -184,7 +184,8 @@ scanner/
 - Native `BarcodeDetector` is only available on Chromium (Chrome / Edge / Samsung Internet). Safari / Firefox fall back to the pure-JS decoder, which is slower but still functional at 25 fps.
 - `camera=(self)` in `Permissions-Policy` is load-bearing — without it, iOS Safari will silently deny `getUserMedia` inside the PWA.
 - Service worker precaches the build assets. After a new deploy, clients get the updated bundle on next navigation because `sw.js` is served `no-cache`; a hard refresh is never required.
-- QR payloads are static — a screenshot of a valid ticket will activate successfully if it reaches the gate before the legitimate holder. Defence against double-use relies entirely on the backend's `is_used` flag, which returns 409 (`already`) on any second scan of the same serial. If screenshot sharing becomes a real problem, the mitigation is rotating payloads (HMAC over a time slot) on the ticket side, not anything in this scanner.
+- QR payloads rotate (HMAC over a 30 s time slot, per-ticket seed), so a screenshot stops working within about a minute; a second scan of the same ticket returns 409 (`already`).
+- Two scanners that are BOTH offline cannot see each other's admissions: the same ticket could pass both, and the second admission comes back as a flagged conflict at sync. Assign distinct zones per gate to narrow this.
 - The 5-second dedup window is purely to suppress duplicate callbacks from html5-qrcode for a single physical scan. Staff rescanning the same ticket intentionally within 5s will not produce a second API call — they'll see the cached result card instead.
 
 ## See also
