@@ -91,7 +91,7 @@ Four roles per event contract:
 
 | Role | Holder | Permissions |
 |---|---|---|
-| **Owner** | The organizer's wallet if they connected one; otherwise the platform's **cold owner key** (ownership is handed over after setup) | Sovereign actions (`transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`, `setRelayer`) |
+| **Owner** | Always the platform's **cold owner key** (2026-10-23 — the clone is created platform-owned, the roles are set, ownership goes to the cold key, the roles are read back). An organizer gets ownership only on request (dashboard → *Request ownership*, 2FA), transferred by an admin with the cold wallet | Sovereign actions (`transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`, `setRelayer`) |
 | **Operator** | Platform signer (default) | Day-to-day ops (`increaseSupply`, `toggleSale`, `toggleTicketType`, `addTicketType`, `setTypeURI`, `updateBaseURI`). Organizer can revoke via `setOperator(0x0)` / `renounceOperator` |
 | **Platform** | Platform role key | The setup phase (locked after), `activateTicket` at the gate, and a ONE-time `cancelEvent` / `endEvent` (used by the dashboard cancel and the automatic end) |
 | **Relayer** | Relayer key | Broadcasts gasless NFT claims (`claimTicketFor`) |

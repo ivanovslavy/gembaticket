@@ -85,6 +85,7 @@ The left rail lists eleven destinations. All of them require admin auth.
 | `/monitoring` | Activity | Services, RPC, Redis, DB |
 | `/access` | KeyRound | Admins + master scanner keys |
 | `/account` | UserCog | My account — e-mail, password, wallet, two-factor |
+| `/ownership` | FileKey | Contract ownership requests — transfer with the cold wallet (GembaChain added to the wallet config) |
 
 `Login.jsx` is public; every other route is wrapped in `DashboardLayout`, which rejects non-admins.
 

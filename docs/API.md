@@ -41,6 +41,7 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | POST | `/:id/edit/request-otp` | JWT | Starts the 2FA confirmation for a date/venue change. |
 | PATCH | `/:id` | JWT | `{ eventDate, endDate?, timezone?, venue, code }` (an end earlier than a ticket window is refused — shorten the window first) — 2FA-confirmed date/time/venue change; `eventDate` is venue wall-clock in `timezone` (default: the event's zone). |
 | POST | `/:id/share-promo` · `/:id/promo-type` | JWT | Send free promo tickets / add promo supply. |
+| GET · POST · DELETE | `/:id/ownership` · `/:id/ownership/request` | JWT | Contract ownership: who owns it (the platform's cold key by default); ask for it to go to your linked wallet `{ code }` (2FA from `/:id/edit/request-otp`), or withdraw the request. |
 
 ## Tickets (`/api/tickets`)
 
@@ -114,6 +115,8 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | POST | `/account/email/start` · `/account/email/confirm` | admin | Code to the NEW address → confirm. |
 | GET · POST | `/account/wallet/nonce` · `/account/wallet` | admin | The NEW wallet signs the server-built message → new session; old wallet out. |
 | POST | `/account/2fa/totp/setup` · `/totp/enable` · `/email/enable` · `/disable` · `/backup-codes` | admin | Two-factor (off by default). |
+
+| GET · POST | `/ownership-requests` · `/ownership-requests/:id/confirm` `{ txHash }` · `/:id/reject` | admin | Ownership requests; *confirm* only succeeds once the chain shows the new owner (the admin signs `transferOwnership` with the cold wallet in the panel). |
 
 The rest of `/api/admin` (monitoring, organizers, events, chain jobs, admins, master scanners) is internal to the admin panel.
 

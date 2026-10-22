@@ -13,13 +13,13 @@ After an event is deployed, every change to its on-chain state (supply, sale tog
 
 Organizers are email-and-password users who have never held an EVM wallet. Making them sign transactions would break the product. The contract therefore has an **Operator** role, held by the platform signer by default, that can call the day-to-day functions on the organizer's behalf. To prevent the platform from being free-riding labor, every operator-initiated call is metered: the organizer pays `gas + €5` in fiat via GembaPay before the platform sends the transaction.
 
-Sovereignty is preserved — the organizer can swap the operator to any address, or revoke it entirely, with a free transaction at any time.
+Ownership (2026-10-23): every contract is owned by the platform's offline cold key, so the role keys are always set correctly at deploy. An organizer who wants to control the contract itself asks for ownership in the dashboard; the platform transfers it to their linked wallet, and from then on they can change the operator themselves.
 
 ## Four-role model
 
 | Role | Who holds it | What they can do |
 |---|---|---|
-| **Owner** | Organizer wallet (or an initial platform-held wallet that the organizer later claims) | `transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`, `renounceOperator`, plus everything Operator can do |
+| **Owner** | The platform's cold key; the organizer's linked wallet only after an approved ownership request | `transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`, `renounceOperator`, plus everything Operator can do |
 | **Operator** | Platform signer (default); `null` after `renounceOperator` | `toggleSale`, `increaseSupply`, `toggleTicketType`, `increaseTypeSupply`, `addTicketType`, `setTokenURI`, `setTypeURI`, `updateBaseURI`, `setURI` |
 | **Platform** | Platform signer, one-time | `setupEvent` during deploy. Locked after setup. |
 | **MintSigner** | Platform signer, EIP-712 | Signs off-chain claim messages for `claim(…)` |
