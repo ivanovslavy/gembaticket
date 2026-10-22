@@ -94,7 +94,7 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | POST | `/activate` | scanner | Admit + burn (same checks). `409` on a second activation. `423 { heldBy }` when another gate holds the ticket's offline right and cannot be reached (a reachable one is asked and the call waits ≤ 6 s). The on-chain `activateTicket` follows asynchronously (chain worker) for claimed NFTs. |
 | POST | `/activate-manual` | scanner | Admit by ticket id when the QR cannot be read (same `423` rule). |
 | GET  | `/snapshot` | scanner | Offline mode: active events + valid tickets, ETag'd. Send `X-Offline-Protocol: 2`: a ticket's QR seed comes only to the scanner holding its **offline entry right** (`own`), others carry `holder` (the gate that holds it); `leaseSeq` = the scanner's release counter. Without the header: no seeds. |
-| POST | `/offline/heartbeat` | scanner | `{ released: [ticketId] }` → `{ seq, release: [ticketId], stale }` — every 3 s while online: acknowledge dropped rights, get the ones to drop, `stale` = refetch the snapshot. |
+| POST | `/offline/heartbeat` | scanner | `{ released: [ticketId], since }` → `{ seq, release: [ticketId], stale, used: [{ id, activatedAt }], serverTime }` — every 3 s while online: acknowledge dropped rights, get the ones to drop, `stale` = refetch the snapshot, `used` = tickets this scanner holds that were used since `since` (send back `serverTime` next time) — mark them used locally. |
 | POST | `/sync` | scanner | Replay offline door decisions (idempotent per `clientId`; `conflict` = another scanner admitted it first). |
 
 ## Platform admin (`/api/admin`)
