@@ -34,12 +34,12 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET  | `/` | public | Active events (organizers also see their own). |
+| GET  | `/` | public | `?status=` `ACTIVE` (default — upcoming), `ENDED` (past) or `CANCELED`. The same list signed in or not (until 2026-10-22 a signed-in user got every event of every organizer); drafts and unpaid deploys are never listed. |
 | GET  | `/:id` | public | Detail, ticket types with sale gates, stats, `endsAt` (when the event ends on its own), `hasDiscountCodes`. The organizer additionally gets `refunds` (refund progress after a cancel). |
-| POST | `/` | JWT | Create event (multipart, optional poster). Wall-clock times + `timezone`. Requires a connected GembaPay account. |
+| POST | `/` | JWT | Create event (multipart, optional poster). Wall-clock times + `timezone`. `endDate` (venue time, after `eventDate`; the dashboard always sends it): no ticket entry window may end after it (`400`), a type without an end is valid until it. Without `endDate` the end is computed from the windows. Requires a connected GembaPay account. |
 | POST | `/:id/deploy` | JWT | Deploys the event contract. Free while fees are off (`FEES_ENABLED=false`): returns `{ free: true, deploying: true }`. Deploys are queued one at a time. |
 | POST | `/:id/edit/request-otp` | JWT | Starts the 2FA confirmation for a date/venue change. |
-| PATCH | `/:id` | JWT | `{ eventDate, timezone?, venue, code }` — 2FA-confirmed date/time/venue change; `eventDate` is venue wall-clock in `timezone` (default: the event's zone). |
+| PATCH | `/:id` | JWT | `{ eventDate, endDate?, timezone?, venue, code }` (an end earlier than a ticket window is refused — shorten the window first) — 2FA-confirmed date/time/venue change; `eventDate` is venue wall-clock in `timezone` (default: the event's zone). |
 | POST | `/:id/share-promo` · `/:id/promo-type` | JWT | Send free promo tickets / add promo supply. |
 
 ## Tickets (`/api/tickets`)
@@ -78,6 +78,7 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | PUT / DELETE | `/api/dashboard/zones/:id` | Update / remove. |
 | GET / POST | `/api/dashboard/scanners` | Organizer's scanners / create `{ eventId?, label, zones?, activeUntil? }` — plain key returned **once**. |
 | POST | `/api/dashboard/scanners/:id/reveal` | Re-reveal the key from its AES-GCM copy; audit-logged. |
+| POST | `/api/dashboard/scanners/:id/pair` | One-time **pairing QR** `{ url, qrDataUrl, expiresAt }` — 10 minutes, single use, the token is in the URL fragment; the key is never shown. |
 | GET | `/api/dashboard/scanners/:id/logs` | Scan log. |
 | DELETE | `/api/dashboard/scanners/:id` | Revoke. |
 | GET | `/api/dashboard/events/:eventId/actions` | Last 100 chain actions. |
@@ -88,7 +89,10 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/auth` | scanner-key | Exchange `{ apiKey }` for a short-lived scanner-JWT + scanner/event context. |
+| POST | `/auth` | scanner-key | Exchange `{ apiKey }` for a 2-hour scanner-JWT + a **refresh token** + scanner/event context. |
+| POST | `/pair` | public | `{ pairToken }` — redeem the pairing QR once → same answer as `/auth`. |
+| POST | `/refresh` | public | `{ refreshToken }` → a new 2-hour JWT for that device session (until 2026-10-22 the gate signed itself out after 2 hours). |
+| POST | `/logout` | scanner | Ends this device's session. Revoking the scanner ends all of its sessions. |
 | GET  | `/me` | scanner | Current scanner + event + zones. |
 | POST | `/scan` | scanner | `{ payload }` — read-only check of the rotating QR. `403 { valid: false, reason }` for a wrong event/zone, outside the entry window, a canceled or ended event, or a canceled / refunded / unpaid ticket. |
 | POST | `/activate` | scanner | Admit + burn (same checks). `409` on a second activation. `423 { heldBy }` when another gate holds the ticket's offline right and cannot be reached (a reachable one is asked and the call waits ≤ 6 s). The on-chain `activateTicket` follows asynchronously (chain worker) for claimed NFTs. |

@@ -217,3 +217,13 @@ Two scanners that are both offline cannot see each other. The only way one ticke
 - The offline pill shows *"this gate can admit N of M tickets"*. The Raspberry Pi reader (`rpi-reader/reader.py`) speaks the same protocol.
 
 E2E: `tests/e2e/offline-right-e2e.js` — 45 checks, incl. a real browser in offline mode and the Pi engine.
+
+
+## Pairing QR and self-renewing sign-in (2026-10-22)
+
+- **Dashboard → Scanners → Pair a device** shows a QR (`POST /api/dashboard/scanners/:id/pair`). It works **once**, for **10 minutes**; the token sits in the URL fragment (`/pair#…`), is stored server-side only as a sha256, and is removed from the address bar on arrival. The phone's camera opens the scanner app already signed in — the key itself is never shown.
+- Every sign-in (QR or key) creates a **device session** (`ScannerSession`, refresh token as sha256). The 2-hour scanner JWT renews itself on a 401 and every hour; before this the gate signed itself out after 2 hours and every scan came back *Denied*.
+- Logout ends that device's session; revoking the scanner ends all of its sessions at once (`/api/scanner/refresh` → 401).
+- Limits: `/pair` 60/min and `/refresh` 120/min per IP (a venue pairs many phones at once), `/auth` stays 10/min.
+
+E2E: `tests/e2e/scanner-pairing-e2e.js` (26).

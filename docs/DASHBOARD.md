@@ -318,3 +318,8 @@ Chain-action endpoints inherit the auth limit only (no separate gate — GembaPa
 - [`API.md`](./API.md) — every endpoint referenced here.
 - [`OTP_FLOW.md`](./OTP_FLOW.md) — the login OTP shape.
 - [`DEPLOYMENT.md`](./DEPLOYMENT.md) — how the dashboard gets built + shipped to the Raspberry Pi.
+
+
+## Event end and pairing a scanner (2026-10-22)
+- The create form has **Starts** and **Ends** (venue time). Ticket entry windows can be shorter than the event, never longer; the event ends on its own at the end time (editable later with 2FA).
+- **Scanners → Pair a device** shows a one-time QR (10 minutes); scanning it with the gate phone signs the scanner app in.
