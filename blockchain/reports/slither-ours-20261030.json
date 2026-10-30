@@ -1,0 +1,982 @@
+[
+ {
+  "target": "EventContract721V3",
+  "check": "incorrect-modifier",
+  "impact": "Low",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Modifier EventContract721V3.onlyOwnerOrPlatformOnce() (contracts/EventContract721V3.sol#498-508) does not always execute _; or revert"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "incorrect-modifier",
+  "impact": "Low",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Modifier EventContract1155V3.onlyOwnerOrPlatformOnce() (contracts/EventContract1155V3.sol#625-635) does not always execute _; or revert"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "missing-zero-check",
+  "impact": "Low",
+  "confidence": "Medium",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "EventContract721V3.setOperator(address)._new (contracts/EventContract721V3.sol#351) lacks a zero-check on : - operator = _new (contracts/EventContract721V3.sol#352)"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "missing-zero-check",
+  "impact": "Low",
+  "confidence": "Medium",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "EventContract721V3.setRelayer(address)._new (contracts/EventContract721V3.sol#374) lacks a zero-check on : - relayer = _new (contracts/EventContract721V3.sol#375)"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "missing-zero-check",
+  "impact": "Low",
+  "confidence": "Medium",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "EventContract1155V3.setRelayer(address)._new (contracts/EventContract1155V3.sol#479) lacks a zero-check on : - relayer = _new (contracts/EventContract1155V3.sol#480)"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "missing-zero-check",
+  "impact": "Low",
+  "confidence": "Medium",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "EventContract1155V3.setOperator(address)._new (contracts/EventContract1155V3.sol#456) lacks a zero-check on : - operator = _new (contracts/EventContract1155V3.sol#457)"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "shadowing-local",
+  "impact": "Low",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "EventContract721V3.getEventInfo().name (contracts/EventContract721V3.sol#421) shadows: - ERC721Upgradeable.name() (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#86-89) (function) - IERC721Metadata.name() (node_modules/@openzeppelin/contracts/token/ERC721/extensi"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "shadowing-local",
+  "impact": "Low",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "EventContract1155V3.getEventInfo().name (contracts/EventContract1155V3.sol#544) shadows: - EventContract1155V3.name() (contracts/EventContract1155V3.sol#118) (function)"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "shadowing-local",
+  "impact": "Low",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "EventContract1155V3.getTicketTypeInfo(uint256).name (contracts/EventContract1155V3.sol#526) shadows: - EventContract1155V3.name() (contracts/EventContract1155V3.sol#118) (function)"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "timestamp",
+  "impact": "Low",
+  "confidence": "Medium",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "PlatformRegistry.getEvents(uint256,uint256) (contracts/PlatformRegistry.sol#266-278) uses timestamp for comparisons Dangerous comparisons: - end > allEvents.length (contracts/PlatformRegistry.sol#271) - i < length (contracts/PlatformRegistry.sol#275)"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "assembly",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "EventContract721V3._recoverSigner(bytes32,bytes) (contracts/EventContract721V3.sol#445-464) uses assembly - INLINE ASM (contracts/EventContract721V3.sol#452-456)"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "assembly",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "EventContract1155V3._recoverSigner(bytes32,bytes) (contracts/EventContract1155V3.sol#570-589) uses assembly - INLINE ASM (contracts/EventContract1155V3.sol#577-581)"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "low-level-calls",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Low level call in PlatformRegistry._deployEvent(uint256,string,string,uint256,address) (contracts/PlatformRegistry.sol#143-187): - (success,None) = eventAddress.call(abi.encodeWithSignature(initialize(string,string,uint256,address,address,address),_eventName,_baseURI,_maxSupply,_organizer,platformSi"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "low-level-calls",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Low level call in PlatformRegistry.withdraw(address,uint256) (contracts/PlatformRegistry.sol#197-202): - (sent,None) = _to.call{value: _amount}() (contracts/PlatformRegistry.sol#199)"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "low-level-calls",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Low level call in PlatformRegistry.fundSigner(uint256) (contracts/PlatformRegistry.sol#204-208): - (sent,None) = platformSigner.call{value: _amount}() (contracts/PlatformRegistry.sol#205)"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._maxSupply (contracts/PlatformRegistry.sol#121) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.setTemplate(uint256,address)._eventType (contracts/PlatformRegistry.sol#214) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.setPlatformSigner(address)._newSigner (contracts/PlatformRegistry.sol#229) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._eventName (contracts/PlatformRegistry.sol#119) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._organizer (contracts/PlatformRegistry.sol#122) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.predictEventAddress(uint256,address)._organizer (contracts/PlatformRegistry.sol#282) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.predictEventAddress(uint256,address)._eventType (contracts/PlatformRegistry.sol#281) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.setMintSigner(address)._newMintSigner (contracts/PlatformRegistry.sol#235) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._paymentHash (contracts/PlatformRegistry.sol#123) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.withdraw(address,uint256)._to (contracts/PlatformRegistry.sol#197) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.setMultisig(address)._newMultisig (contracts/PlatformRegistry.sol#241) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._baseURI (contracts/PlatformRegistry.sol#120) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.setAdmin(address)._newAdmin (contracts/PlatformRegistry.sol#247) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.getEvents(uint256,uint256)._limit (contracts/PlatformRegistry.sol#266) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.setTemplate(uint256,address)._newTemplate (contracts/PlatformRegistry.sol#214) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.createEvent(uint256,string,string,uint256,address,bytes32)._eventType (contracts/PlatformRegistry.sol#118) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.fundSigner(uint256)._amount (contracts/PlatformRegistry.sol#204) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.withdraw(address,uint256)._amount (contracts/PlatformRegistry.sol#197) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "Parameter PlatformRegistry.getEvents(uint256,uint256)._offset (contracts/PlatformRegistry.sol#266) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.initialize(string,string,uint256,address,address,address)._uri (contracts/EventContract721V3.sol#125) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.initialize(string,string,uint256,address,address,address)._owner (contracts/EventContract721V3.sol#127) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.setTokenURI(uint256,string)._tokenId (contracts/EventContract721V3.sol#307) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.setMintSigner(address)._new (contracts/EventContract721V3.sol#364) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.setTokenURI(uint256,string)._uri (contracts/EventContract721V3.sol#307) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.setOperator(address)._new (contracts/EventContract721V3.sol#351) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.claimTicketFor(address,bytes32,bytes)._signature (contracts/EventContract721V3.sol#227) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.setRelayer(address)._new (contracts/EventContract721V3.sol#374) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.getTicketInfo(uint256)._tokenId (contracts/EventContract721V3.sol#405) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.setBaseURI(string)._newBaseURI (contracts/EventContract721V3.sol#162) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.initialize(string,string,uint256,address,address,address)._maxSupply (contracts/EventContract721V3.sol#126) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.initialize(string,string,uint256,address,address,address)._platform (contracts/EventContract721V3.sol#128) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.updateBaseURI(string)._newBaseURI (contracts/EventContract721V3.sol#312) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.claimTicket(bytes32,bytes)._signature (contracts/EventContract721V3.sol#183) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.claimTicket(bytes32,bytes)._claimHash (contracts/EventContract721V3.sol#182) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.tokenURI(uint256)._tokenId (contracts/EventContract721V3.sol#390) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.transferOwnership(address)._newOwner (contracts/EventContract721V3.sol#379) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.initialize(string,string,uint256,address,address,address)._eventName (contracts/EventContract721V3.sol#124) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.setPlatform(address)._new (contracts/EventContract721V3.sol#341) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.claimTicketFor(address,bytes32,bytes)._recipient (contracts/EventContract721V3.sol#225) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.activateTicket(uint256)._tokenId (contracts/EventContract721V3.sol#261) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.increaseSupply(uint256)._additional (contracts/EventContract721V3.sol#301) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.initialize(string,string,uint256,address,address,address)._mintSigner (contracts/EventContract721V3.sol#129) is not in mixedCase"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "Parameter EventContract721V3.claimTicketFor(address,bytes32,bytes)._claimHash (contracts/EventContract721V3.sol#226) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.addTicketType(uint256,string,uint256,uint256)._typeMaxSupply (contracts/EventContract1155V3.sol#393) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setOperator(address)._new (contracts/EventContract1155V3.sol#456) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.claimTicket(uint256,bytes32,bytes)._typeId (contracts/EventContract1155V3.sol#238) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setBaseURI(string)._newURI (contracts/EventContract1155V3.sol#218) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setRelayer(address)._new (contracts/EventContract1155V3.sol#479) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.initialize(string,string,uint256,address,address,address)._maxSupply (contracts/EventContract1155V3.sol#162) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.increaseTypeSupply(uint256,uint256)._additional (contracts/EventContract1155V3.sol#380) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.claimTicketFor(address,uint256,bytes32,bytes)._signature (contracts/EventContract1155V3.sol#292) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.addTicketType(uint256,string,uint256,uint256)._name (contracts/EventContract1155V3.sol#392) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.toggleTicketType(uint256)._typeId (contracts/EventContract1155V3.sol#373) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.claimTicketFor(address,uint256,bytes32,bytes)._claimHash (contracts/EventContract1155V3.sol#291) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.initialize(string,string,uint256,address,address,address)._uri (contracts/EventContract1155V3.sol#161) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.createTicketType(uint256,string,uint256,uint256)._typeId (contracts/EventContract1155V3.sol#191) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.addTicketType(uint256,string,uint256,uint256)._zoneLevel (contracts/EventContract1155V3.sol#394) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.claimTicket(uint256,bytes32,bytes)._claimHash (contracts/EventContract1155V3.sol#239) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.initialize(string,string,uint256,address,address,address)._platform (contracts/EventContract1155V3.sol#164) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.createTicketType(uint256,string,uint256,uint256)._name (contracts/EventContract1155V3.sol#192) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.initialize(string,string,uint256,address,address,address)._mintSigner (contracts/EventContract1155V3.sol#165) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.claimTicketFor(address,uint256,bytes32,bytes)._recipient (contracts/EventContract1155V3.sol#289) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.getTicketInfo(uint256)._tokenId (contracts/EventContract1155V3.sol#506) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.increaseTypeSupply(uint256,uint256)._typeId (contracts/EventContract1155V3.sol#380) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.createTicketType(uint256,string,uint256,uint256)._zoneLevel (contracts/EventContract1155V3.sol#194) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setTypeURI(uint256,string)._typeId (contracts/EventContract1155V3.sol#412) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.transferOwnership(address)._newOwner (contracts/EventContract1155V3.sol#484) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setMintSigner(address)._new (contracts/EventContract1155V3.sol#469) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.initialize(string,string,uint256,address,address,address)._eventName (contracts/EventContract1155V3.sol#160) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.uri(uint256)._id (contracts/EventContract1155V3.sol#495) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.createTicketType(uint256,string,uint256,uint256)._typeMaxSupply (contracts/EventContract1155V3.sol#193) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.claimTicket(uint256,bytes32,bytes)._signature (contracts/EventContract1155V3.sol#240) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setTypeURI(uint256,string)._typeUri (contracts/EventContract1155V3.sol#412) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setPlatform(address)._new (contracts/EventContract1155V3.sol#446) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.activateTicket(uint256)._tokenId (contracts/EventContract1155V3.sol#332) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.setURI(string)._newURI (contracts/EventContract1155V3.sol#418) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.getTicketTypeInfo(uint256)._typeId (contracts/EventContract1155V3.sol#523) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.addTicketType(uint256,string,uint256,uint256)._typeId (contracts/EventContract1155V3.sol#391) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.initialize(string,string,uint256,address,address,address)._owner (contracts/EventContract1155V3.sol#163) is not in mixedCase"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "naming-convention",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "Parameter EventContract1155V3.claimTicketFor(address,uint256,bytes32,bytes)._typeId (contracts/EventContract1155V3.sol#290) is not in mixedCase"
+ },
+ {
+  "target": "PlatformRegistry",
+  "check": "pragma",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/PlatformRegistry.sol"
+  ],
+  "desc": "2 different versions of Solidity are used: - Version constraint ^0.8.20 is used by: -^0.8.20 (node_modules/@openzeppelin/contracts/proxy/Clones.sol#4) -^0.8.20 (node_modules/@openzeppelin/contracts/utils/Create2.sol#4) -^0.8.20 (node_modules/@openzeppelin/contracts/utils/Errors.sol#4) -^0.8.20 (node"
+ },
+ {
+  "target": "EventContract721V3",
+  "check": "pragma",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract721V3.sol"
+  ],
+  "desc": "6 different versions of Solidity are used: - Version constraint ^0.8.20 is used by: -^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol#4) -^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol#4) -^0.8.20 (node_modules/@ope"
+ },
+ {
+  "target": "EventContract1155V3",
+  "check": "pragma",
+  "impact": "Informational",
+  "confidence": "High",
+  "files": [
+   "contracts/EventContract1155V3.sol"
+  ],
+  "desc": "5 different versions of Solidity are used: - Version constraint ^0.8.20 is used by: -^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol#4) -^0.8.20 (node_modules/@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol#4) -^0.8.20 (node_modules/@o"
+ }
+]

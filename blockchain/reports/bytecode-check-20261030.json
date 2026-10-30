@@ -1,0 +1,26 @@
+[
+ {
+  "name": "PlatformRegistry",
+  "localBytes": 5098,
+  "chainBytes": 5222,
+  "identicalIgnoringMetadata": false,
+  "g1InSource": false,
+  "g1OnChain": false
+ },
+ {
+  "name": "EventContract721V3",
+  "localBytes": 12367,
+  "chainBytes": 12614,
+  "identicalIgnoringMetadata": false,
+  "g1InSource": true,
+  "g1OnChain": true
+ },
+ {
+  "name": "EventContract1155V3",
+  "localBytes": 15236,
+  "chainBytes": 15518,
+  "identicalIgnoringMetadata": false,
+  "g1InSource": true,
+  "g1OnChain": true
+ }
+]

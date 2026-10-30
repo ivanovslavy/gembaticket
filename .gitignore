@@ -109,3 +109,8 @@ backup/
 *.dump
 *.bak-*
 *.bak.*
+
+# Application configuration lives in the PRIVATE repo (ivanovslavy/gembaticket.com), like
+# backend/, frontend/ and scanner/ above. shared/qr-window.json is the QR acceptance window the
+# API, the scanner PWA and the Pi reader all read — product code, not documentation.
+shared/
