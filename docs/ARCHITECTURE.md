@@ -64,7 +64,8 @@
 | `dashboard.gembaticket.com` | :3104 (dashboard SPA) | Cloudflare Origin |
 | `scanner.gembaticket.com` | :3107 (scanner PWA) | Cloudflare Origin (HTTPS required for camera) |
 | `listener.gembaticket.com` | worker health endpoint | Cloudflare Origin |
-| `ipfs.gembaticket.com` | IPFS gateway | Cloudflare Origin |
+| `ipfs.gembaticket.com` | IPFS gateway — serves ONLY our pinned content (kubo `Gateway.NoFetch`) | Cloudflare Origin |
+| `*.ipfs.gembaticket.com` | IPFS subdomain gateway for wallets (MetaMask gateway `gembaticket.com`) — translator on .208 to `ipfs.gembaticket.com` | Let's Encrypt wildcard (DNS-01) |
 
 ## Data stores
 
