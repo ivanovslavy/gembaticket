@@ -227,3 +227,97 @@ E2E: `tests/e2e/offline-right-e2e.js` — 45 checks, incl. a real browser in off
 - Limits: `/pair` 60/min and `/refresh` 120/min per IP (a venue pairs many phones at once), `/auth` stays 10/min.
 
 E2E: `tests/e2e/scanner-pairing-e2e.js` (26).
+
+---
+
+# 2026-10-30 — what changed at the gate, and why
+
+Everything in this section closed a finding from the 11.10 code reading or a point on the
+sale-readiness list. Each change has an end-to-end test and a canary that proves the test can fail.
+
+## One acceptance window, one file
+
+A ticket QR is judged by three different engines — the API (Node), the scanner PWA (browser) and the
+Raspberry Pi reader (Python) — and until today each carried its own copy of the numbers, which had
+drifted:
+
+| | accepted age of a QR |
+|---|---|
+| API | `0 … rotation+5` → 0…35 s |
+| PWA / Pi | `−40 … rotation+5+40` → −40…+75 s |
+
+Two real consequences: a phone whose clock ran **one second fast** was turned away at an online door
+(`age < 0`), and the same code was accepted at an offline door and refused at an online one.
+
+`shared/qr-window.json` is now the only definition (`aheadS`, `behindS`, `clockSlackS`,
+`snapshotMaxAgeS`, `rotationIntervalDefaultS`). The API reads it, the PWA compiles it in, the Pi
+reads it beside its state, and **the snapshot carries it** so the server stays the authority at run
+time. Each engine keeps an identical fallback copy and the e2e fails if any of them disagree.
+Offline is the same window widened by the clock slack — and nothing else.
+
+## Offline data has a shelf life
+
+A scanner that has not synced for a long time is judging a world that has moved: tickets refunded,
+cancelled or moved to another phone since are still "valid" in its copy. Past
+`Event.offlineMaxSnapshotAgeS` (12 h by default) a scanner refuses to decide alone and says how old
+its data is and what to do. The limit is per event.
+
+## The entry guard fails closed — and fast
+
+The per-ticket entry guard (3 attempts / 10 s) used to return "allowed" whenever Redis was
+unreachable, so taking Redis down removed the limit on entries. An entry now fails **closed** with a
+503 that explains itself; a lookup (`/scan`, which changes nothing) still fails open, and `/scan` is
+rate-limited per ticket too, so a captured payload cannot be probed freely for the whole rotation
+window.
+
+🔑 Worse than it looked: with Redis unreachable ioredis queued each command and retried for about
+**40 seconds**, so every guard in the app decided correctly and a minute late — the door was told
+"Expired QR code" because the payload had aged out while the limiter was still waiting. The client
+now fails fast (no offline queue after the first connect, one retry, hard timeouts) and the deploy
+lock still throws, so two deploys can never run unlocked.
+
+## The entry QR belongs to one phone
+
+`GET /t/<viewToken>` used to hand the ticket's QR seed to anybody who had the link, and the seed was
+never rotated — so a forwarded link was not a stale screenshot but a permanent generator of valid
+entry codes, and the buyer never found out.
+
+The first phone to open a ticket now binds to it and only that phone receives the seed (and the
+server-rendered QR image, which is just as good a credential). Another phone with the same link sees
+the ticket and a button — *use this phone for entry* — which rotates the seed, rebinds, writes a
+`qr_device_claim` audit row, and makes the first phone's cached copy worthless at the gate. Five
+moves per ten minutes per caller, so nobody can cycle the seed to lock a ticket out of its own phone.
+A page that sends no device id (an older build) still gets its server-rendered QR, so nobody is
+locked out mid-event.
+
+**The trade-off, stated plainly:** a phone that is offline when the seed rotates keeps generating
+codes from the old seed and will be refused until it opens the ticket online once. That is the price
+of being able to revoke a forwarded link at all, and it is bounded by the snapshot shelf life above.
+
+## One scanner key, one device
+
+Two phones signed in with the same key were one door to the server: they were handed the **same**
+offline entry rights, so while both were offline each could admit the same ticket. A key now belongs
+to the first device that pairs with it; a second device is refused with 409 and told to release it in
+the dashboard first. **Release device** on the event's Scanners page unbinds the phone, ends its live
+sessions and leaves an audit row. The page shows which device holds each key and since when.
+
+Soft transition: a client that sends no device id still gets a session (it just does not claim the
+key), so nothing is thrown out mid-event; pairing by QR requires the id, since that always comes
+from a current build. The device id is checked **before** the one-time pairing code is consumed —
+otherwise an old client would burn the organizer's QR.
+
+## A ticket sold mid-event reaches the door
+
+Offline entry rights used to be handed out only while cutting a snapshot (every 60 s, and only with
+the app in the foreground, because a backgrounded browser stops its timers). A ticket bought during
+the event therefore reached no door's offline data, and that buyer could not get in while the venue
+network was down. The heartbeat (every 3 s) now hands out rights for unheld tickets, answers with
+`picked`, and both clients pull a fresh snapshot at once — seeds only travel in a snapshot. Returning
+to the foreground beats and syncs immediately. Moving a right still happens only at snapshot time,
+because that needs the current holder's acknowledgement.
+
+## The ticket says which gate
+
+The ticket page now shows the door that holds its offline entry right ("Entry: North Gate"), and the
+name follows the right when it moves — so people queue where they can actually be admitted.
