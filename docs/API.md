@@ -51,7 +51,7 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | POST | `/discount/check` | public (20/min per IP) | `{ eventId, ticketTypeId, quantity, code }` → price preview `{ valid, unitPrice, unitDiscount, total, totalBefore }` or `400 { valid: false, error }`. |
 | GET  | `/:id` · `/by-token/:token` | public | Ticket view (rotating QR). |
 | GET  | `/my` | JWT | Current user's tickets. |
-| GET  | `/event/:eventId` | JWT | Organizer view — tickets for their event. |
+| GET  | `/event/:eventId` | JWT + organizer role | Organizer view — tickets for their event. |
 
 ## Dashboard (`/api/dashboard`, JWT, own events only)
 
@@ -78,6 +78,14 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | GET / POST | `/api/dashboard/events/:eventId/zones` | List / create `{ name, color?, level }`. |
 | PUT / DELETE | `/api/dashboard/zones/:id` | Update / remove. |
 | GET / POST | `/api/dashboard/scanners` | Organizer's scanners / create `{ eventId?, label, zones?, activeUntil? }` — plain key returned **once**. |
+
+> **Roles (т.22б, 2026-10-31).** `Organizer.role` is `buyer | organizer | admin` and defaults to
+> **buyer**. Every `/api/dashboard/*` route and every authenticated write on an event requires the
+> organizer (or admin) role; a buyer account gets `403 { code: "organizer-required" }`. Registration
+> produces an organizer only when the request declares `intent: "organizer"` (the dashboard's signup
+> form does); the storefront's does not. `POST /api/auth/become-organizer { confirm: true }` is the one
+> deliberate way a buyer account becomes an organizer account, and it returns a fresh token because the
+> role is a JWT claim. See `DASHBOARD.md` §1.
 | POST | `/api/dashboard/scanners/:id/reveal` | Re-reveal the key from its AES-GCM copy; audit-logged. |
 | POST | `/api/dashboard/scanners/:id/pair` | One-time **pairing QR** `{ url, qrDataUrl, expiresAt }` — 10 minutes, single use, the token is in the URL fragment; the key is never shown. |
 | GET | `/api/dashboard/scanners/:id/logs` | Scan log. |

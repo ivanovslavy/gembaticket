@@ -94,9 +94,45 @@ it returns is, in general, **not** the address that will be deployed. Nothing is
 real address is emitted by `EventCreated`, which is what the backend uses), but any caller that trusts
 this view — a front-end pre-filling an address, say — is told the wrong thing.
 
-**Not fixed here.** A fix changes `PlatformRegistry`, which means a redeploy of the registry, which
-means every event contract is re-pointed. That is the owner's decision; the alternative is to drop the
-view (nothing in our stack calls it) or to document it as "valid only within the current block".
+### Fixed in the source on 2026-10-31 — NOT on the live chain
+
+The salt now has ONE definition, and it has no timestamp in it:
+
+```solidity
+/// @dev The ONE place the CREATE2 salt is derived. `_deployEvent` and `predictEventAddress`
+///      both call it, so the prediction cannot drift from the deployment again.
+function _eventSalt(address _organizer, uint256 _index) internal pure returns (bytes32) {
+    return keccak256(abi.encodePacked(_organizer, _index));
+}
+```
+
+`allEvents.length` is already unique for every event ever created, so the timestamp added no
+uniqueness — only the drift. The function is `pure`, which means the compiler itself now refuses any
+future attempt to read `block.timestamp` back into the salt (the canary below proved that: restoring
+the bug fails to compile until you also widen `pure` to `view`).
+
+Tests: `blockchain/test/PlatformRegistry-predict.test.js` — **7 passing**, including
+"still predicts correctly after time passes between the view and the creation", which is the
+regression itself. Canary (a copy outside the live tree with `block.timestamp` put back):
+**4 failing / 3 passing**, each failure an address mismatch.
+
+### 🔴 Known limitation of the LIVE deployment
+
+**The registry on GembaBlockchain testnet 821207 (`0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02`) still
+carries the old salt.** The fix is in the source only; nothing was redeployed, because a new registry
+re-points every event contract and that is the owner's decision, not a side effect of a code review.
+So, on the live chain today:
+
+* `predictEventAddress(eventType, organizer)` returns an address that is correct **only if the event
+  is created in the same block as the call** — in practice, wrong.
+* Nothing in our stack reads it. The backend takes the real address from the `EventCreated` event,
+  which is emitted by the transaction that actually deploys the clone. No ticket, payment, scan or
+  payout depends on the view.
+* Treat it as a documented wrong answer: do not build a front-end that pre-fills an address from it,
+  and do not quote it to an integrator.
+
+**Recorded for the mainnet deploy.** The mainnet registry is deployed from this (fixed) source, so
+mainnet never carries the bug. See `deployed/gemba-latest.json` → `knownLimitations`.
 
 ## 3. What was NOT analysed
 

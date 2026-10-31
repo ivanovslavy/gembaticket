@@ -140,6 +140,12 @@ contract PlatformRegistry is ReentrancyGuard {
     // INTERNAL DEPLOY
     // =========================================================================
 
+    /// @dev The ONE place the CREATE2 salt is derived. `_deployEvent` and `predictEventAddress`
+    ///      both call it, so the prediction cannot drift from the deployment again.
+    function _eventSalt(address _organizer, uint256 _index) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_organizer, _index));
+    }
+
     function _deployEvent(
         uint256 _eventType,
         string calldata _eventName,
@@ -147,11 +153,12 @@ contract PlatformRegistry is ReentrancyGuard {
         uint256 _maxSupply,
         address _organizer
     ) internal returns (address eventAddress) {
-        bytes32 salt = keccak256(abi.encodePacked(
-            _organizer,
-            allEvents.length,
-            block.timestamp
-        ));
+        // CREATE2 salt. `allEvents.length` is already unique per deployment — it is incremented
+        // for every event ever created — so nothing is gained by mixing in `block.timestamp`, and
+        // mixing it in is what made `predictEventAddress` lie: the view runs in one block and the
+        // creation in another, so the two salts differed and the predicted address was wrong.
+        // (2026-10-31, finding "the one thing worth fixing" in docs/STATIC-ANALYSIS-2026-10-30.md)
+        bytes32 salt = _eventSalt(_organizer, allEvents.length);
 
         // Clone template
         if (_eventType == 0) {
@@ -277,17 +284,19 @@ contract PlatformRegistry is ReentrancyGuard {
         }
     }
 
+    /// @notice The address the NEXT event created for `_organizer` will get.
+    /// @dev Exact, not indicative: the salt is `(organizer, index)` and the index is the one this
+    ///      view reads, so the answer holds until somebody else creates an event first (which moves
+    ///      the index). It no longer depends on `block.timestamp`, which used to make the answer
+    ///      wrong in every block but the one the event happened to be created in.
     function predictEventAddress(
         uint256 _eventType,
         address _organizer
     ) external view returns (address) {
-        bytes32 salt = keccak256(abi.encodePacked(
-            _organizer,
-            allEvents.length,
-            block.timestamp
-        ));
+        if (_eventType != 0 && _eventType != 1) revert InvalidEventType();
         address template = _eventType == 0 ? erc721Template : erc1155Template;
-        return Clones.predictDeterministicAddress(template, salt);
+        if (template == address(0)) revert InvalidTemplate();
+        return Clones.predictDeterministicAddress(template, _eventSalt(_organizer, allEvents.length));
     }
 
     function contractBalance() external view returns (uint256) {

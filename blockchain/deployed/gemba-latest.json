@@ -54,5 +54,18 @@
       "EventContract1155V3.initialize": "0xb9abf68f8d1ad49389cab8017f617f84a0c960ae90fddd307b00821495ef498b",
       "setTemplate(1)": "0x0b0f04335c3fe4c3299ecdf5fadb4d6640001c26c8b78f7156874f8cd53a508d"
     }
-  }
+  },
+  "knownLimitations": [
+    {
+      "id": "predictEventAddress-timestamp-salt",
+      "since": "deployment of this registry",
+      "recorded": "2026-10-31",
+      "severity": "not a security issue — a view that returns a wrong answer",
+      "what": "PlatformRegistry.predictEventAddress() on THIS live registry builds its CREATE2 salt from (organizer, allEvents.length, block.timestamp), the same as _deployEvent does. The view is called in one block and the event created in another, so the two salts differ and the predicted address is, in general, not the address that gets deployed.",
+      "impact": "None on-chain and none in our stack: the backend takes the real address from the EventCreated event. Only an external caller that trusted the view would be misled.",
+      "fixedInSource": "2026-10-31 — the salt is (organizer, index) with no timestamp, derived in one internal pure function _eventSalt() used by both the deploy and the view. Tests: blockchain/test/PlatformRegistry-predict.test.js (7 passing).",
+      "onChain": "NOT fixed. Fixing it on testnet means deploying a new PlatformRegistry and re-pointing every event contract — the owner's decision, deliberately not taken as part of a code review.",
+      "mainnet": "The mainnet registry MUST be deployed from the fixed source. Verify before the deploy: contracts/PlatformRegistry.sol contains _eventSalt() and the string 'block.timestamp' does not appear in any salt."
+    }
+  ]
 }

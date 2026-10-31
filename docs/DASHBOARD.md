@@ -13,7 +13,29 @@ This document describes every screen the organizer sees, in the order a first-ti
 `POST /api/auth/register { email, password, name, company?, wallet?, turnstileToken? }`
 
 - Server validates inputs, checks email/wallet uniqueness, then emails a 6-digit OTP (Redis, 10-min TTL, 30s resend cooldown). **No DB row is written yet** — abandoned signups leave nothing behind.
-- UI prompts for the code → `POST /api/auth/register-verify-otp { email, password, name, company?, wallet?, phone?, code }` → re-runs uniqueness checks, creates the organizer with `verified=true`, returns `{ token, organizer }`.
+- UI prompts for the code → `POST /api/auth/register-verify-otp { email, password, name, company?, wallet?, phone?, code, intent? }` → re-runs uniqueness checks, creates the account with `verified=true`, returns `{ token, organizer }`.
+
+#### 🔑 Buyer or organizer? (т.22б, 2026-10-31)
+
+The storefront and this dashboard share ONE registration endpoint, so the role cannot be inferred from
+the request — the dashboard sends `intent: "organizer"` deliberately and everything else produces a
+**buyer** account. `Organizer.role` is `buyer` by default; `buyer | organizer | admin`.
+
+A buyer account holds tickets. It cannot open any part of this dashboard: `requireOrganizer` sits on
+every `/api/dashboard/*` group and on every authenticated event write (create, deploy, PATCH,
+share-promo, promo-type, edit/request-otp, the ownership routes), plus `/api/stats` and
+`/api/tickets/event/:id`. The answer is `403 { code: "organizer-required" }`, and the dashboard renders
+one page — "This is a buyer account" — instead of a sidebar full of dead links.
+
+The body can never NAME the role: `{ role: "admin" }` in a signup is ignored. The only way across is
+deliberate:
+
+`POST /api/auth/become-organizer { confirm: true, company? }` → `{ token, organizer, changed }`
+
+`confirm: true` is required (a stray POST cannot flip an account), the switch is logged, and the answer
+carries a **fresh token** — the role is a JWT claim, so the old token keeps being refused until the app
+swaps it. An `admin` is never downgraded; calling it on an account that is already an organizer returns
+`changed: false` and a matching token.
 
 ### Log in
 
