@@ -13,7 +13,8 @@
     "PlatformRegistry": {
       "address": "0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02",
       "type": "singleton",
-      "verified": "https://testnet.gembascan.io/address/0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02#code"
+      "verified": "https://testnet.gembascan.io/address/0x32977E6391e7C25BF0Ddc2a5f4c9A311e5bA1d02#code",
+      "verifiedNote": "The `verified` link above shows the explorer-verified source as deployed, which PREDATES the predictEventAddress salt fix recorded in knownLimitations[0]. blockchain/contracts/PlatformRegistry.sol now contains _eventSalt() (used by both the deploy and the view); the deployed+verified bytecode does not. So the verified source no longer matches the published .sol — expected, because the registry was deliberately NOT redeployed. Any mainnet registry must be deployed from the fixed source."
     },
     "EventContract721": {
       "address": "0x3Ba630bF309249354F25a22c2f0A3EC6b34183D8",

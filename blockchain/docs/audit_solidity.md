@@ -11,7 +11,9 @@
 
 ## 1. Executive Summary
 
-This report documents the security analysis of the GembaTicket v2 smart contract system — a payment-agnostic NFT ticketing platform that never holds funds with lazy minting and signature-based claiming. The contracts were subjected to static analysis (Slither v0.11.5), symbolic execution (Mythril v0.24.8), and comprehensive functional testing (220 assertions across two test suites, 100% pass rate).
+This report documents the security analysis of the GembaTicket smart contract system — a payment-agnostic NFT ticketing platform that never holds funds, with lazy minting and signature-based claiming. The contracts were subjected to static analysis (Slither v0.11.5), symbolic execution (Mythril v0.24.8) and functional testing (**81 test cases containing 129 assertions, 81 passing**).
+
+> **Scope note.** The body of this report was written against **v2**. The templates the registry clones today are **V3** (`EventContract721V3.sol` / `EventContract1155V3.sol`), which add the `relayer` role and `claimTicketFor(…)`; see `../deployed/gemba-latest.json` and the hardening notes in §8. Sections that still describe v2 behaviour are marked where they differ.
 
 **Final Results:**
 
@@ -19,11 +21,10 @@ This report documents the security analysis of the GembaTicket v2 smart contract
 |------|------|--------|-----|---------------|
 | Slither v0.11.5 | 0 | 0 | 0 | 77 (dependencies + style) |
 | Mythril v0.24.8 | 0 | 0 | 0 | 0 |
-| Hardhat Test Suite | — | — | — | 65/65 passed |
-| Integration Test Suite | — | — | — | 155/155 passed |
-| **Total Assertions** | | | | **220/220 passed** |
+| Hardhat test suite | — | — | — | 81/81 test cases passed |
+| **Total** | | | | **81 test cases / 129 assertions, 0 failing** |
 
-**Verdict:** All contracts pass security analysis with zero actionable findings. The 77 Slither informational findings are confirmed false positives (dependency warnings, naming conventions, and style suggestions). All 220 functional test assertions pass on Hardhat localhost network.
+**Verdict:** All contracts pass security analysis with zero actionable findings. The 77 Slither informational findings are confirmed false positives (dependency warnings, naming conventions, and style suggestions). All 81 test cases pass on the Hardhat localhost network (129 `expect()` assertions, 0 failing).
 
 ---
 
@@ -104,7 +105,7 @@ The key innovation is **signature-based claiming**: tickets exist as database re
 
 ### 3.3 Claim Flow (Signature-Based)
 
-The claim system uses backend-signed EIP-712 messages to authorize NFT minting:
+The claim system uses backend-signed **EIP-191 `personal_sign`** messages to authorize NFT minting. (This report originally described the signature as EIP-712; it is not — the contracts hash with the `"\x19Ethereum Signed Message:\n32"` prefix via `_toEthSignedMessageHash`, and no EIP-712 domain separator or typed-data hashing exists anywhere in `contracts/`.)
 
 ```
 1. Buyer purchases ticket via GembaPay (card or PayPal)
@@ -113,13 +114,21 @@ The claim system uses backend-signed EIP-712 messages to authorize NFT minting:
 4. Buyer connects wallet (MetaMask or similar)
 5. Backend generates:  claimHash = keccak256(unique claim identifier)
 6. Backend signs:      signature = mintSigner.sign(contractAddress, [typeId], claimHash, walletAddress)
-7. Buyer calls:        claimTicket(claimHash, signature) — buyer pays gas
-8. Contract verifies:  ecrecover(hash, signature) == mintSigner → mints NFT to buyer
+7. Holder signs:       a free OFF-CHAIN ownership message (no gas, no transaction)
+8. Relayer calls:      claimTicketFor(recipient, [typeId,] claimHash, signature)
+                       — the PLATFORM RELAYER broadcasts and PAYS THE GAS
+9. Contract verifies:  ecrecover(hash, signature) == mintSigner → mints NFT to the holder
 ```
+
+> **The buyer pays no gas.** In the live v3.1 flow the platform's relayer wallet broadcasts
+> `claimTicketFor()` and pays for it, so the holder mints for 0 GMB and only signs a free off-chain
+> message. The backend exposes only `POST /api/claim/relay` for this. The original client-pays
+> `claimTicket` is preserved on-chain but its route is disabled. Because the mintSigner signature
+> binds the recipient, a compromised relayer cannot redirect a mint.
 
 The mintSigner key holds zero balance and never submits transactions. It only signs claim authorization messages. If compromised, it can be rotated via `setMintSigner()` without any fund loss.
 
-### 3.4 Three-Role Security Model
+### 3.4 Role Separation Model
 
 ```
 Owner (organizer):
@@ -133,10 +142,23 @@ Platform Signer (deploy key, funded with gas):
   → One-time emergency cancel (after setup, never reusable)
 
 Mint Signer (claim signatures only, zero balance):
-  → Signs claim authorization messages off-chain
+  → Signs claim authorization messages off-chain (EIP-191 personal_sign)
   → Never submits transactions
   → Isolated from platform signer for defense-in-depth
+
+Relayer (v3.1; separate broadcasting wallet, backend RELAYER_KEY):
+  → Broadcasts claimTicketFor() and PAYS the mint gas
+  → Set per clone at setup via setRelayer; owner-changeable
+  → Cannot redirect a mint: the mintSigner signature binds the recipient
+
+Operator (platform signer by default; null after renounceOperator):
+  → Day-to-day calls on the organizer's behalf (toggleSale, increaseSupply,
+    ticket types, URIs) under modifier onlyOwnerOrOperator
 ```
+
+Counting the roles the live V3 templates enforce, there are **five**: Owner, Operator, Platform,
+Relayer and MintSigner. (Earlier revisions of this report said "three"; that predates both the
+Operator split and the v3.1 relayer.)
 
 ### 3.5 Setup Phase Lockout
 
@@ -218,20 +240,34 @@ Mythril performs symbolic execution and SMT solving to detect:
 
 ### 4.3 Functional Testing
 
-Two complementary test suites were used:
+One Hardhat suite, four files, run against Hardhat's in-process network.
 
-**Hardhat Test Suite** (`test/GembaTicketV2.test.js`):
 - Framework: Hardhat + Chai + ethers.js v6
-- 65 tests across 10 describe blocks
-- Uses Hardhat's built-in local node with automatic mining
-- Event emission verification via Chai matchers
+- Hardhat's built-in local node with automatic mining
+- Event emission verified via Chai matchers
 
-**Integration Test Suite** (`scripts/test-*.js`):
-- Framework: Custom assertion scripts via Hardhat Runtime Environment
-- 155 assertions across 3 test files (30 test sections)
-- Runs against any network (localhost, Sepolia, Polygon)
-- Reads deployment addresses from `deployed/<network>-latest.json`
-- Uses actual MINT_SIGNER_KEY from environment for signature verification
+| File | Test cases (`it(`) | Assertions (`expect(`) |
+|---|---|---|
+| `test/GembaTicketV2.test.js` | 57 | 92 |
+| `test/GembaTicketV3.test.js` | 14 | 23 |
+| `test/GembaTicketV3-hardening.test.js` | 3 | 4 |
+| `test/PlatformRegistry-predict.test.js` | 7 | 10 |
+| **Total** | **81** | **129** |
+
+Reproduce every number in this section:
+
+```bash
+npx hardhat test                            # → 81 passing
+grep -rhoE '\bit\('     test/*.js | wc -l   # → 81   (test cases)
+grep -rhoE '\bexpect\(' test/*.js | wc -l   # → 129  (assertions)
+```
+
+> **Correction.** Earlier revisions of this report described a second, "integration" suite of
+> **155 assertions across 3 files** named `test-erc721-lifecycle.js`, `test-erc1155-lifecycle.js`
+> and `test-platform-security.js`, run via `scripts/test-all.js`, and added it to the Hardhat count
+> to reach a headline of **220**. **No such files exist** — not in `scripts/`, not in `test/`, and
+> not in the repository's history as published. The figures above are the whole of the functional
+> testing, and "test cases" and "assertions" are counted separately rather than conflated.
 
 ---
 
@@ -268,6 +304,11 @@ Mythril's symbolic execution engine explored all reachable execution paths withi
 - No access control violations
 
 ### 5.3 Hardhat Test Suite Results (test/GembaTicketV2.test.js)
+
+> **Historical capture.** The run below is the original v2-era output of `GembaTicketV2.test.js`
+> alone, preserved as it was recorded (`65 passing`). That file now contains **57** test cases, and
+> the suite as a whole — all four files — is **81 passing**. For the current, reproducible figures
+> see §4.3 and §5.4; this block is kept for the audit trail, not as a present-day count.
 
 ```
   GembaTicket v2
@@ -361,65 +402,33 @@ Mythril's symbolic execution engine explored all reachable execution paths withi
 | EventContract721 | 2,457,925 |
 | PlatformRegistry | 1,347,931 |
 
-### 5.4 Integration Test Suite Results (scripts/test-all.js)
+### 5.4 Per-File Test Results
+
+Run on the Hardhat in-process network, 2026-10-31:
 
 ```
-╔════════════════════════════════════════════════╗
-║   GembaTicket v2 — Full Test Suite             ║
-║   Network: localhost                            ║
-╠════════════════════════════════════════════════╣
-║   ✔ ERC721 Lifecycle      — 45 passed, 0 failed║
-║   ✔ ERC1155 Lifecycle     — 53 passed, 0 failed║
-║   ✔ Platform Security     — 57 passed, 0 failed║
-╠════════════════════════════════════════════════╣
-║   ✔ ALL TESTS PASSED      — 155 passed, 0 failed║
-╚════════════════════════════════════════════════╝
+$ npx hardhat test
+  ...
+  81 passing (9s)
 ```
 
-**test-erc721-lifecycle.js — 45 assertions, 10 sections:**
+| File | Test cases | Assertions | Covers |
+|---|---|---|---|
+| `test/GembaTicketV2.test.js` | 57 | 92 | v2 lifecycle: initialization and roles, setup-phase lock-in, claiming (721 and 1155), owner functions, supply and ticket-type transitions, transfer restrictions after activation, refund paths via `cancelEvent` / `endEvent` |
+| `test/GembaTicketV3.test.js` | 14 | 23 | v3 relayed claiming: `claimTicketFor` by the relayer, recipient binding, `usedClaims` replay rejection, cross-contract signature rejection, `setRelayer` authorization |
+| `test/GembaTicketV3-hardening.test.js` | 3 | 4 | G1 hardening: `activateTicket` rejects a never-minted tokenId; `_recoverSigner` rejects high-s (malleable) signatures per EIP-2 |
+| `test/PlatformRegistry-predict.test.js` | 7 | 10 | `_eventSalt()` determinism — that `predictEventAddress()` and `_deployEvent()` derive the same salt from `(organizer, index)`. See the known limitation below. |
+| **Total** | **81** | **129** | |
 
-| # | Section | Assertions | Coverage |
-|---|---------|-----------|----------|
-| 1 | Create ERC721 Event | 9 | Event deployment, name, supply, sale state, owner, platform, mintSigner, setup state, registry tracking |
-| 2 | Setup Phase | 6 | Random user blocked, sale enabled, setup complete, platform locked (enableSale, setBaseURI, completeSetup) |
-| 3 | Claim Ticket | 7 | Wrong signer rejected, mint count, NFT owned by buyer (no escrow), double claim rejected, replay attack blocked, second buyer, total minted |
-| 4 | Custom Token URI | 3 | Base URI works, custom token URI set, other tokens use base URI |
-| 5 | Activate Ticket | 4 | Random user blocked, ticket activated, activated by correct address, double activate rejected |
-| 6 | Transfer Lock | 2 | Activated ticket blocked, non-activated transfers OK |
-| 7 | Owner Functions | 5 | Sale toggle off/on, supply increase, random user blocked (toggleSale, increaseSupply) |
-| 8 | End Event | 4 | Event ended, sale off, activated ticket transfers after end, claim after end rejected |
-| 9 | Max Supply | 1 | Max supply reached reverts |
-| 10 | Cancel Event | 4 | Event canceled, sale off, claim on canceled rejected, end on canceled rejected |
-
-**test-erc1155-lifecycle.js — 53 assertions, 10 sections:**
-
-| # | Section | Assertions | Coverage |
-|---|---------|-----------|----------|
-| 1 | Create ERC1155 Event | 4 | Event name, global supply, 0 types, setup incomplete |
-| 2 | Setup — Create Ticket Types | 13 | Random user blocked, owner blocked during setup, General/VIP/Backstage/All Access zones (name, max, zone), duplicate type reverts, type count, setup locked, platform locked |
-| 3 | Claim Tickets per Zone | 12 | Total minted, ownership per zone (General, VIP, Backstage, All Access), type verification, zone level verification, invalid type reverts |
-| 4 | Signature Security | 3 | Wrong signer rejected, replay (wrong wallet) rejected, double claim rejected |
-| 5 | Activate & Transfer Lock | 3 | Token activated, activated transfer blocked, non-activated transfers OK |
-| 6 | Owner Functions | 9 | Type toggle off/on, claim deactivated type blocked, type supply increase, global supply increase, add type after setup, random user blocked (toggleSale, addTicketType) |
-| 7 | Custom Type URI | 2 | Default base URI, custom type URI per zone |
-| 8 | Type Max Supply | 2 | Type max supply reverts, count verification |
-| 9 | End Event | 2 | Event ended, activated transfers after end |
-| 10 | Platform Emergency | 2 | Platform emergency cancel, random user blocked |
-
-**test-platform-security.js — 57 assertions, 10 sections:**
-
-| # | Section | Assertions | Coverage |
-|---|---------|-----------|----------|
-| 1 | PlatformRegistry Access Control | 10 | Attacker blocked: createEvent, setPlatformSigner, setMintSigner, setTemplate, togglePause, setAdmin, withdraw, fundSigner, setMultisig; signer creates event |
-| 2 | Pause System | 4 | Pause, createEvent blocked, unpause, createEvent after unpause |
-| 3 | Template Upgrade | 4 | ERC721 template updated, event with new template, zero template blocked, invalid type blocked |
-| 4 | Treasury | 4 | Receive ETH, withdraw, fund signer, withdraw to zero blocked |
-| 5 | Zero Address Checks | 5 | Zero blocked: platform signer, mint signer, multisig, admin, event organizer |
-| 6 | Event Contract Access | 7 | Attacker blocked: toggleSale, updateBaseURI, increaseSupply, transferOwnership, setMintSigner, setPlatform, activateTicket |
-| 7 | Key Rotation | 7 | Claim with original mintSigner, mintSigner rotated, old mintSigner rejected, new mintSigner works, platform rotated, non-owner blocked (mintSigner, platform) |
-| 8 | Setup Phase Security | 5 | Owner blocked during setup (createTicketType, enableSale, completeSetup), platform locked after setup, owner adds type after setup |
-| 9 | Admin Role Transfer | 3 | Admin transferred, old admin blocked, new admin can pause |
-| 10 | Constructor Validation & Views | 8 | Zero address reverts (admin, ERC721 template, ERC1155 template, mintSigner), total events count, getEvents pagination, mintSigner set, platformSigner set |
+> **Known limitation, not fixed on-chain.** `PlatformRegistry.predictEventAddress()` on the **live**
+> registry builds its CREATE2 salt from `(organizer, allEvents.length, block.timestamp)`, so the view
+> and the later deploy compute different salts and the predicted address is generally not the
+> deployed one. It is **not a security issue** — a view returning a wrong answer — and it does not
+> affect this stack, because the backend takes the real address from the `EventCreated` event. It is
+> fixed in source (`_eventSalt()`, 2026-10-31) and covered by
+> `test/PlatformRegistry-predict.test.js`, but the live registry was **deliberately not
+> redeployed**. A mainnet registry MUST be deployed from the fixed source. See
+> `.knownLimitations[0]` in `../deployed/gemba-latest.json`.
 
 ---
 
@@ -517,7 +526,7 @@ All public/external functions validate:
 - [x] Dual-signer isolation: platform signer (gas) + mint signer (signatures, zero balance)
 - [x] Setup phase lockout: platform functions permanently locked after completeSetup()
 - [x] onlyOwnerOrPlatformOnce modifier for post-setup emergency access
-- [x] 220 functional test assertions covering lifecycle, security, and edge cases
+- [x] 81 functional test cases / 129 assertions covering lifecycle, security, and edge cases
 - [x] Slither audit — 0 high, 0 medium, 0 low
 - [x] Mythril audit — 0 issues detected on all 3 contracts
 
@@ -535,11 +544,11 @@ All public/external functions validate:
 
 ## 9. Conclusion
 
-The GembaTicket v2 smart contract system demonstrates strong security posture across all analyzed dimensions. The payment-agnostic, lazy-mint architecture eliminates the most common class of DeFi vulnerabilities (fund handling, price manipulation, flash loans) by design. The signature-based claiming model removes the need for a ClaimContract escrow, reducing attack surface further.
+The GembaTicket smart contract system demonstrates strong security posture across all analyzed dimensions. The payment-agnostic, lazy-mint architecture eliminates the most common class of DeFi vulnerabilities (fund handling, price manipulation, flash loans) by design. The signature-based claiming model removes the need for a ClaimContract escrow, reducing attack surface further.
 
-The three-role security model (owner, platform signer, mint signer) provides defense-in-depth: compromising the mint signer exposes zero funds, and key rotation is instant. The setup phase lockout prevents platform overreach after initial configuration.
+The role-separated security model — owner, operator, platform signer, relayer and mint signer (five roles in the live V3 templates) — provides defense-in-depth: compromising the mint signer exposes zero funds, a compromised relayer cannot redirect a mint because the signature binds the recipient, and key rotation is instant. The setup phase lockout prevents platform overreach after initial configuration.
 
-Both Slither and Mythril confirm zero actionable security findings. All 220 functional test assertions pass across two complementary test suites. The contracts are ready for testnet deployment and integration testing.
+Both Slither and Mythril confirm zero actionable security findings. All **81 functional test cases pass (129 assertions, 0 failing)** in the single Hardhat suite. The contracts are deployed on GembaBlockchain testnet (chainId 821207); the one recorded limitation, `predictEventAddress`, is fixed in source and deliberately not redeployed — see §5.4.
 
 ---
 
