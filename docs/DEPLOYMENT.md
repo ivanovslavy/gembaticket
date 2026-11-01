@@ -121,7 +121,7 @@ sudo systemctl restart gembaticket-api gembaticket-chain-worker gembaticket-list
 - `DATABASE_URL`, `JWT_SECRET`
 - `REDIS_URL` (port 6380)
 - `ETHEREUM_RPC_URL`, `CHAIN_ID`, `REGISTRY_ADDRESS`, `ERC721_TEMPLATE`, `ERC1155_TEMPLATE`, `PLATFORM_SIGNER_KEY`, `MINT_SIGNER_KEY`
-- Fallback RPC pool (optional, appended after the public endpoints in `src/config/rpcEndpoints.js` — see [`BACKEND.md`](./BACKEND.md#rpc-resilience-fallbackjsonrpcprovider)): `INFURA_API_KEY`, `ALCHEMY_API_KEY`, `QUICKNODE_SEPOLIA_URL`, `ANKR_API_KEY_1`…`ANKR_API_KEY_5`, `MORALIS_API_KEY`, `GETBLOCK_BSC_TESTNET_URL`, `CHAINSTACK_BSC_MAINNET_URL`
+- Fallback RPC pool (optional, appended after the public endpoints in `src/config/rpcEndpoints.js` — see [`BACKEND.md`](./BACKEND.md#rpc-resilience-fallbackjsonrpcprovider)): `INFURA_API_KEY`, `ALCHEMY_API_KEY`, `QUICKNODE_SEPOLIA_URL`, `ANKR_API_KEY_1`…`ANKR_API_KEY_5`, `MORALIS_API_KEY`, `GETBLOCK_BSC_TESTNET_URL`, `CHAINSTACK_BSC_MAINNET_URL`. **These names are legacy** and are read verbatim by `rpcEndpoints.js`: the live chain is GembaBlockchain (chainId 821207), and the Sepolia/BSC-flavoured names are dormant fallback slots, not an indication that those chains are in use
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_REPLY_TO`
 - `GEMBAPAY_API_URL`, `GEMBAPAY_API_KEY`, `GEMBAPAY_WEBHOOK_SECRET`
 - `SCANNER_KEY_SECRET` — 32-byte hex, reversible AES-256-GCM master key
@@ -131,7 +131,7 @@ sudo systemctl restart gembaticket-api gembaticket-chain-worker gembaticket-list
 
 - `VITE_API_URL` (`https://api.gembaticket.com`)
 - `VITE_WALLETCONNECT_PROJECT_ID`
-- `VITE_SEPOLIA_RPC_URL`
+- `VITE_SEPOLIA_RPC_URL` — legacy name; holds a **GembaBlockchain** RPC URL (chainId 821207), not a Sepolia one
 - `VITE_TURNSTILE_SITE_KEY` (optional)
 - `VITE_ETHERSCAN_BASE` (dashboard)
 

@@ -46,7 +46,7 @@ Checkout is guest-first: email → purchase OTP → `POST /tickets/buy` → Gemb
 Organizer workspace. End-to-end walkthrough in [`DASHBOARD.md`](./DASHBOARD.md). Highlights:
 
 - Event wizard (metadata → contract type → ticket types → publish).
-- Deploy flow with €10 GembaPay charge.
+- Deploy flow. The €10 GembaPay charge it is built around is **dormant** — live config is `FEES_ENABLED=false`, so a deploy returns `{ free: true }` with a `null` payment URL and proceeds gas-only. The paid path is retained, not deleted.
 - Post-deploy panels: **SupplyPanel**, **OperatorPanel**, **ActionHistory**, sale toggle — all funnelled through a single **ChainActionPaymentModal** that estimates gas in EUR, opens GembaPay checkout, and polls `/api/dashboard/actions/:id` until terminal.
 - Scanner management (create with once-shown plain key, re-reveal via AES-GCM, edit, revoke).
 - Zones CRUD.
@@ -76,8 +76,8 @@ Each app reads a small `.env` at build time:
 
 - `VITE_API_URL` — typically `https://api.gembaticket.com`.
 - `VITE_WALLETCONNECT_PROJECT_ID` — WalletConnect Cloud project id.
-- `VITE_SEPOLIA_RPC_URL` — public GembaBlockchain RPC fallback.
+- `VITE_SEPOLIA_RPC_URL` — public GembaBlockchain RPC fallback. **The name is legacy**: the chain has been GembaBlockchain (chainId 821207) since 2026-06-08 and there is no Sepolia involved. Renaming it is a coordinated frontend + deploy change and has not been done.
 - `VITE_TURNSTILE_SITE_KEY` — optional, enables Turnstile on register/login.
-- `VITE_ETHERSCAN_BASE` — for the dashboard's on-chain links.
+- `VITE_ETHERSCAN_BASE` — for the dashboard's on-chain links. Also a legacy name: it points at GembaScan (`https://testnet.gembascan.io`), not Etherscan.
 
 No secrets live in the frontend bundles — payment capture, OTP, and signing all round-trip through the API.

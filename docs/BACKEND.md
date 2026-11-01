@@ -80,7 +80,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md#prisma-schema-highlights). Core tables
 - EIP-712 claim signatures bound to contract address (mint-signer key isolated from the API hot path).
 - Reversible AES-256-GCM for scanner-key re-reveal only (not for any user-facing secret).
 - Cloudflare Turnstile on register/login (optional).
-- Solidity contracts audited (Slither 0/0/0, Mythril 0/0/0, 220 functional assertions) — see [`blockchain/docs/audit_solidity.md`](../blockchain/docs/audit_solidity.md).
+- Solidity contracts audited (Slither 0/0/0, Mythril 0/0/0, 81 contract test cases / 129 `expect()` assertions (`npx hardhat test` → 81 passing, 0 failing)) — see [`blockchain/docs/audit_solidity.md`](../blockchain/docs/audit_solidity.md).
 
 ## Where it runs
 

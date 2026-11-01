@@ -2,7 +2,7 @@
 
 **A modern web3 ticket-sales platform — completely free.** GembaTicket lets organizers sell tickets online and receive the proceeds directly into their own balances at the moment of purchase. It removes printed paper tickets, gives organizers **full control over access to the event's different entrances/gates**, and leaves a **permanent NFT keepsake** in the hands of attendees. Buyers pay by card or PayPal via GembaPay, and every ticket is an ERC-721 or ERC-1155 multi-page NFT on **GembaBlockchain**. Rotating QRs at the gate, tiered tickets (Early Bird / Regular / VIP / Stage), per-zone scanners, and a workflow where the platform signs on the organizer's behalf so no Web3 knowledge is required.
 
-> **0 fees.** GembaTicket is a next-generation, blockchain-based platform that runs on **GembaBlockchain** and charges **no platform fees, no commissions, no hidden costs**. The only transaction costs come from the payment provider: GembaPay (standard **1%**), plus Stripe/PayPal's own fees on card and PayPal payments. See the [Terms](https://gembaticket.com/terms) and [Refund Policy](https://gembaticket.com/refund).
+> **0 fees.** GembaTicket is a next-generation, blockchain-based platform that runs on **GembaBlockchain** and charges **no platform fees, no commissions, no hidden costs**. The only transaction costs come from the payment provider: GembaPay (standard **1% + €0.20 per transaction**), plus Stripe/PayPal's own fees on card and PayPal payments. See the [Terms](https://gembaticket.com/terms) and [Refund Policy](https://gembaticket.com/refund).
 
 > **GembaBlockchain — our own EVM-compatible Layer-1, with ~0 gas fees** (public testnet). The blockchain is an **invisible layer**: the backend signs transactions when needed, so attendees and organizers **never deal with wallets, gas, or signing** — a modern, user-friendly experience.
 
@@ -16,7 +16,7 @@
 [![Solidity](https://img.shields.io/badge/solidity-0.8.28-363636)]()
 [![OZ](https://img.shields.io/badge/OpenZeppelin-5.4-4E5EE4)]()
 [![Pattern](https://img.shields.io/badge/proxy-EIP--1167%20minimal-6366F1)]()
-[![Upgradeability](https://img.shields.io/badge/upgrade-UUPS-8B5CF6)]()
+[![Upgradeability](https://img.shields.io/badge/upgrade-not%20upgradeable-8B5CF6)]()
 [![Payments](https://img.shields.io/badge/payments-GembaPay-10B981)]()
 
 ---
@@ -25,7 +25,7 @@
 
 Event ticketing built for organizers who don't touch wallets, and for attendees who never have to.
 
-- **Organizers** log in with **email + password (Web2) or their Web3 wallet via Sign-In With Ethereum (SIWE)**, create events on the dashboard **for free**, and get a real on-chain contract for their event. Every supply change, sale toggle, or new ticket type is an on-chain action signed by the platform's operator address on their behalf — **no platform fee, only negligible network gas**. No wallet required. **Two-factor authentication** (email code or authenticator app) and **in-dashboard notifications** are built in.
+- **Organizers** hold an **organizer account** — one `Organizer` table, one login, but two roles (see *Accounts and roles* below). They log in with **email + password (Web2) or their Web3 wallet via Sign-In With Ethereum (SIWE)**, create events on the dashboard **for free**, and get a real on-chain contract for their event. Every supply change, sale toggle, or new ticket type is an on-chain action signed by the platform's operator address on their behalf — **no platform fee, only negligible network gas**. No wallet required. **Two-factor authentication** (email code or authenticator app) and **in-dashboard notifications** are built in.
 - **Attendees** buy tickets by card or PayPal through GembaPay. Each paid ticket is minted to a "ghost wallet" the system creates from their email. They can later claim the NFT to any real wallet, or just use the rotating-QR at the door and forget it's on-chain.
 - **Gate staff** open a PWA on a phone, paste a one-time key, and scan. QR payloads rotate every 30 seconds so a screenshot can't be reused. Zone restrictions (`zoneLevel`) are enforced server-side.
 
@@ -34,7 +34,7 @@ Event ticketing built for organizers who don't touch wallets, and for attendees 
 ```
  ┌─────────┐ Web2 / Web3  ┌─────────────┐          ┌────────────┐
  │Organizer│─────────────▶│  Dashboard  │─────────▶│ GembaPay   │  0 platform fees
- └─────────┘              │ (React SPA) │          │  checkout  │  (GembaPay 1% only)
+ └─────────┘              │ (React SPA) │          │  checkout  │  (GembaPay fee only)
        ▲                   └──────┬──────┘          └─────┬──────┘
        │  confirmed emails        │                       │ webhook
        │                          ▼                       ▼
@@ -78,7 +78,7 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - **GembaPay (with KYC) is the payment provider** — organizers register with GembaPay, complete KYC, and add their API key + webhook secret in settings before they can sell. Funds settle directly to the organizer (Stripe / PayPal); **refunds are the organizer's decision and are paid from their own GembaPay balance** — from GembaPay's refund dashboard, or from the GembaTicket dashboard: refund a single ticket, or cancel an event with automatic refunds (two-factor confirmed).
 
 ### For attendees
-- **No account required** — your ticket is delivered **by email** and opens directly from there; signing up is optional.
+- **No account required** — your ticket is delivered **by email** and opens directly from there; signing up is optional. An account you do create on the storefront is a **buyer account** (`role="buyer"`, the default): it holds your tickets and nothing else. Buying never grants organizer tools.
 - **Multi-page NFT ticket** — event poster image + on-chain event details (date, venue, ticket type) + an interactive QR page.
 - **Invisible blockchain** — no wallet, gas, or signing; the platform handles all on-chain steps for you.
 - Card and PayPal (via GembaPay) — no wallet required.
@@ -89,23 +89,40 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - Clear, public **[Terms](https://gembaticket.com/terms)**, **[Privacy](https://gembaticket.com/privacy)** and **[Refund](https://gembaticket.com/refund)** policies; accepting them is required at sign-up.
 
 ### For platform operators
-- Full on-chain audit trail (`ChainAction` table + Etherscan links per action).
+- Full on-chain audit trail (`ChainAction` table + GembaScan explorer links per action, `https://testnet.gembascan.io`).
 - GembaPay webhook logs with HMAC verification.
 - SMS-free operations: all flows are JWT + email OTP.
 - **Admin panel sign-in by wallet or by e-mail + password**, with optional two-factor (e-mail code or authenticator app); the e-mail and the wallet can be changed from *My account*.
+
+## Accounts and roles
+
+One `Organizer` table, one login, **two roles**. `Organizer.role` defaults to `"buyer"`:
+
+| Role | How you get it | What it can do |
+|---|---|---|
+| `buyer` | **The default.** Any storefront signup, or a script/curl registration. | Hold and view tickets. Every organizer surface returns **`403 {code:"organizer-required"}`**. |
+| `organizer` | Registering **on the dashboard**, which sends `intent:"organizer"`; or an explicit opt-in afterwards via `POST /api/auth/become-organizer`. | Create events, deploy contracts, run chain actions, provision scanners and zones, read event stats. |
+| `admin` | Granted internally only — it can never be requested at signup. | Platform administration. |
+
+The role is never read from the request body (so `"admin"` is impossible to ask for); only the
+*intent* is, and anything that is not `intent:"organizer"` produces a buyer. The upgrade endpoint sits
+behind authentication and a fail-closed 5-per-hour limiter, and because the role travels in the JWT, a
+role change issues a fresh token.
+
+**Buying a ticket never grants organizer tools** — upgrading is always a deliberate, logged step.
 
 ## Stack
 
 | Layer | Tech |
 |---|---|
-| Smart contracts | Solidity 0.8.28, OpenZeppelin 5.4 (UUPS), EIP-1167 minimal proxies, Hardhat |
-| Audit | Slither 0.11.5 (0/0/0), Mythril 0.24.8 (0/0/0), 220 functional assertions (100% pass) — see [`blockchain/docs/audit_solidity.md`](./blockchain/docs/audit_solidity.md) |
+| Smart contracts | Solidity 0.8.28, OpenZeppelin 5.4, EIP-1167 minimal-proxy clones, Hardhat. **Not upgradeable** — no proxy-upgrade mechanism; a fix ships as a new template plus `setTemplate()`. Claim signatures are EIP-191 `personal_sign`. |
+| Audit | Slither 0.11.5 (0/0/0), Mythril 0.24.8 (0/0/0), 81 contract test cases / 129 `expect()` assertions — `npx hardhat test` → **81 passing, 0 failing** — see [`blockchain/docs/audit_solidity.md`](./blockchain/docs/audit_solidity.md) |
 | Backend | Node 20, Express, Prisma ORM, JWT, ethers.js v6, Redis 7 (port 6380), PostgreSQL 16 |
 | Storefront | React 19, Vite 6, Tailwind 4, Framer Motion, RainbowKit + Wagmi, react-helmet-async |
 | Dashboard | React 19, Vite 6, Tailwind 4 |
 | Scanner PWA | React 19, `html5-qrcode`, Dexie (IndexedDB offline snapshot + decision sync) |
 | Payments | GembaPay (cards and PayPal — sister product) |
-| Email | SMTP (Gmail for now; Resend migration planned) |
+| Email | SMTP on our own mail server `mail.gembamail.com:587`, sending as `noreply@gembaticket.com` |
 | Hosting | Hetzner (Ubuntu) / Apache / systemd / Cloudflare |
 
 ## Repository layout (public)
@@ -122,16 +139,23 @@ gembaticket.com/
 │   ├── DASHBOARD.md          organizer dashboard, end-to-end
 │   ├── DEPLOYMENT.md         Pi + systemd + Apache operations
 │   ├── FRONTEND.md           storefront / dashboard / admin overview
+│   ├── I18N.md               the EN/BG/ES translation pass
 │   ├── OTP_FLOW.md           email OTP (login + purchase)
-│   └── SCANNER.md            gate-staff PWA overview
+│   ├── SCANNER.md            gate-staff PWA overview
+│   ├── STATIC-ANALYSIS-2026-10-30.md   Slither/Aderyn run on the live generation
+│   ├── fees-and-limits-gemba.md        fee + limit reference (fees dormant)
+│   └── migration-gembablockchain.md    the move off Sepolia (2026-06-08)
 ├── blockchain/
 │   ├── README.md             smart-contract layer overview
 │   ├── hardhat.config.js     Hardhat configuration
 │   ├── package.json          devDependencies for reproducing builds
+│   ├── contracts/            all 6 .sol files (MIT) — V3 pair is live
 │   ├── docs/                 audit report + platform plans
-│   ├── scripts/              deploy-v2.js, verify-deploy.js
-│   ├── deployed/             chain addresses (GembaBlockchain)
-│   ├── reports/              Slither JSON reports
+│   ├── scripts/              all 8: check-bal, deploy-v2, deploy-v3,
+│   │                         deploy-v3-g1, fund-signer, redeploy-1155,
+│   │                         verify-bytecode, verify-deploy
+│   ├── deployed/             chain addresses (GembaBlockchain + legacy Sepolia)
+│   ├── reports/              Slither + Aderyn reports, bytecode check
 │   └── slither-report.txt    consolidated Slither run output
 └── .gitignore                excludes all application source
 ```
@@ -146,6 +170,9 @@ Application source code (`backend/`, `frontend/`, `scanner/`) is intentionally *
 | Dashboard | https://dashboard.gembaticket.com |
 | API | https://api.gembaticket.com |
 | Scanner PWA | https://scanner.gembaticket.com |
+| Docs | https://docs.gembaticket.com |
+| Listener (chain-worker health) | https://listener.gembaticket.com/health |
+| IPFS gateway | https://ipfs.gembaticket.com/ipfs/`<cid>` |
 | Explorer | https://testnet.gembascan.io (GembaScan) |
 | Chain | GembaBlockchain testnet (chainId 821207) |
 
@@ -171,7 +198,10 @@ If you are an AI agent indexing this repository, start with:
 4. [`docs/CHAIN_ACTIONS.md`](./docs/CHAIN_ACTIONS.md) — on-chain operations.
 5. [`blockchain/docs/audit_solidity.md`](./blockchain/docs/audit_solidity.md) — security review.
 
-The storefront also exposes `/llms.txt`, `/ai.txt`, `/robots.txt`, `/sitemap.xml`, and JSON-LD (`Organization`, `WebSite`, `SoftwareApplication`) for discovery. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md#seo--ai-discoverability) for the full list.
+The storefront exposes `/robots.txt`, `/sitemap.xml`, and JSON-LD for discovery. The AI
+descriptor files (`/llms.txt`, `/llms-full.txt`, `/ai.txt`) were **retired on 2026-08-09** and are
+served a hard 404 by `og-server.cjs` — `robots.txt` still names the AI crawlers explicitly and
+welcomes them, so the retirement is a content decision, not a posture change — 12 distinct `@type`s on the landing page (`Organization`, `WebSite`, `SoftwareApplication`, `FAQPage`, `Question`, `Answer`, `BreadcrumbList`, `ListItem`, `Offer`, `ContactPoint`, `PostalAddress`, `SearchAction`). See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md#seo--ai-discoverability) for the full list.
 
 ## Company
 
@@ -180,4 +210,4 @@ Contact: **hello@gembaticket.com** · Managing Director: Slavcho Ivanov.
 
 ## License
 
-Documentation in this repository is **© 2026 GEMBA EOOD. All rights reserved**. Smart-contract source (not published here) is proprietary; audit reports and deployment artifacts are published for transparency. See individual files for details.
+Smart-contract source under `blockchain/contracts/` **is published and MIT-licensed** — every `.sol` file begins `// SPDX-License-Identifier: MIT`. Documentation in this repository is **© 2024-2026 GEMBA EOOD. All rights reserved**; audit reports and deployment artifacts are published for transparency. The application source — `backend/`, `frontend/`, `scanner/` — is **not published** and remains proprietary. See individual files for details.

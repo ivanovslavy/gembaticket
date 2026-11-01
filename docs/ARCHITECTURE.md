@@ -151,11 +151,35 @@ Served from the storefront public root (Vite `/public`):
 
 - `/robots.txt`
 - `/sitemap.xml`
-- `/llms.txt` — summary + entry points for LLM crawlers
-- `/ai.txt` — data-use policy
-- JSON-LD (`Organization`, `WebSite`, `SoftwareApplication`) injected via `react-helmet-async`
+- ~~`/llms.txt`, `/llms-full.txt`, `/ai.txt`~~ — **retired 2026-08-09.** `og-server.cjs` holds them
+  in an `AI_DESCRIPTORS` set and answers a hard 404 before the static-file branch, so writing the
+  files into `public/` does not bring them back. To un-retire, remove the paths from that set.
+- JSON-LD injected via `react-helmet-async` — 12 distinct `@type`s on the landing page (`Organization`, `WebSite`, `SoftwareApplication`, `FAQPage`, `Question`, `Answer`, `BreadcrumbList`, `ListItem`, `Offer`, `ContactPoint`, `PostalAddress`, `SearchAction`)
 - Open Graph + Twitter Cards on every public page
 - Canonical URLs via helmet
+
+## Uploaded-poster metadata stripping
+
+An event poster is pinned to IPFS, which is public and immutable, so it is scrubbed **before** it
+leaves the API — `backend/src/utils/imageMetadata.js`, called from `createEvent`
+(`backend/src/controllers/eventController.js`). Shipped 2026-10-30.
+
+| Format | Removed | Kept |
+|---|---|---|
+| JPEG | APP1 (Exif, XMP), APP13 (Photoshop/IPTC), APP3–APP12, APP15, `COM` comments | APP0 (JFIF density), APP2 (ICC colour profile) |
+| PNG | `eXIf`, `tEXt`, `zTXt`, `iTXt` (incl. historical "Raw profile type exif") | everything else |
+| WebP | the RIFF container's `EXIF` and `XMP` chunks, with the container size fixed up | everything else |
+| other / unparseable | re-encoded through `sharp`, which drops metadata by construction | — |
+
+The strip is **lossless** for the three parsed formats: only metadata segments are removed, so the
+pinned image is pixel-for-pixel the organizer's upload. The ICC profile is deliberately retained
+because dropping it visibly shifts colours. If an upload cannot be cleaned even by the `sharp`
+fallback, `createEvent` **refuses it with `400`** rather than pinning it.
+
+> **Known gap.** `stripImageMetadata` has exactly one call site, inside `createEvent`.
+> `updateEventDetails` accepts only `{eventDate, venue, code}` and never a poster, so there is no
+> path that re-uploads an existing poster. **Posters pinned before 2026-10-30 therefore keep their
+> original EXIF/XMP/IPTC under permanent, public CIDs** — they were never re-pinned clean.
 
 ## RPC fallback pool
 
@@ -180,4 +204,4 @@ All read/write calls to GembaBlockchain flow through `backend/src/utils/fallback
 - **Deploy key**: one writer at a time (Redis lock shared by the API and the chain worker).
 - **Backups**: nightly, age-encrypted (database, service state, all IPFS pins), private key off the server, off-site copy checksum-verified, restore tested in isolation.
 
-See [`blockchain/docs/audit_solidity.md`](../blockchain/docs/audit_solidity.md) for the formal audit (Slither 0/0/0, Mythril 0/0/0, 220 functional assertions).
+See [`blockchain/docs/audit_solidity.md`](../blockchain/docs/audit_solidity.md) for the formal audit (Slither 0/0/0, Mythril 0/0/0, 81 contract test cases / 129 `expect()` assertions (`npx hardhat test` → 81 passing, 0 failing)).

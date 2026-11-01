@@ -47,7 +47,7 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/buy` | JWT optional | `{ eventId, ticketTypeId, quantity, buyerEmail?, otpToken?, discountCode? }`. `otpToken` required iff no JWT. A discount code is checked inside the purchase transaction. Returns `{ ticketIds, paymentUrl, total, currency, discount }`. |
+| POST | `/buy` | JWT optional | `{ eventId, ticketTypeId, quantity, buyerEmail?, otpToken?, discountCode? }`. `otpToken` required iff no JWT. **`quantity` is clamped server-side to `1…10`** — a larger value is silently reduced to 10 rather than rejected, so echo `ticketIds.length` back to the user instead of assuming the requested quantity. A discount code is checked inside the purchase transaction; a code can never bring the unit price below **0.50 in the ticket type's own currency**. Returns `{ ticketIds, paymentUrl, total, currency, discount }`. |
 | POST | `/discount/check` | public (20/min per IP) | `{ eventId, ticketTypeId, quantity, code }` → price preview `{ valid, unitPrice, unitDiscount, total, totalBefore }` or `400 { valid: false, error }`. |
 | GET  | `/:id` · `/by-token/:token` | public | Ticket view (rotating QR). |
 | GET  | `/my` | JWT | Current user's tickets. |

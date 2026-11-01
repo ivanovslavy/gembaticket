@@ -5,30 +5,31 @@
 > Event deploys and all chain actions complete **gas-only, with no GembaPay charge**: the backend returns
 > `{ free: true }` / a `null` payment URL and proceeds directly. The fee/payment mechanics described below are
 > **retained, dormant, behind the `FEES_ENABLED` flag** — nothing was deleted. The only transaction fee on the
-> platform comes from GembaPay (standard 1%) on buyer payments, plus Stripe/PayPal's own fees on card/PayPal.
+> platform comes from GembaPay (standard 1% + €0.20 per transaction) on buyer payments, plus Stripe/PayPal's own fees on card/PayPal.
 
 After an event is deployed, every change to its on-chain state (supply, sale toggle, ticket types, operator) flows through a single **chain action** pipeline. This document is the canonical reference for how that pipeline is wired.
 
 ## Motivation
 
-Organizers are email-and-password users who have never held an EVM wallet. Making them sign transactions would break the product. The contract therefore has an **Operator** role, held by the platform signer by default, that can call the day-to-day functions on the organizer's behalf. To prevent the platform from being free-riding labor, every operator-initiated call is metered: the organizer pays `gas + €5` in fiat via GembaPay before the platform sends the transaction.
+Organizers are email-and-password users who have never held an EVM wallet. Making them sign transactions would break the product. The contract therefore has an **Operator** role, held by the platform signer by default, that can call the day-to-day functions on the organizer's behalf. The metering described below — the organizer paying `gas + €5` in fiat via GembaPay before the platform sends the transaction — was designed to stop the platform being free-riding labour. **It is dormant.** Live configuration is `FEES_ENABLED=false`, so every action completes gas-only with no GembaPay charge; the mechanics are retained, not deleted, and the amounts below describe the dormant paid mode rather than what an organizer is charged today.
 
 Ownership (2026-10-23): every contract is owned by the platform's offline cold key, so the role keys are always set correctly at deploy. An organizer who wants to control the contract itself asks for ownership in the dashboard; the platform transfers it to their linked wallet, and from then on they can change the operator themselves.
 
-## Four-role model
+## Five-role model
 
 | Role | Who holds it | What they can do |
 |---|---|---|
-| **Owner** | The platform's cold key; the organizer's linked wallet only after an approved ownership request | `transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`, `renounceOperator`, plus everything Operator can do |
+| **Owner** | The platform's cold key; the organizer's linked wallet only after an approved ownership request | `transferOwnership`, `cancelEvent`, `endEvent`, `setPlatform`, `setMintSigner`, `setOperator`, `setRelayer`, `renounceOperator`, plus everything Operator can do |
 | **Operator** | Platform signer (default); `null` after `renounceOperator` | `toggleSale`, `increaseSupply`, `toggleTicketType`, `increaseTypeSupply`, `addTicketType`, `setTokenURI`, `setTypeURI`, `updateBaseURI`, `setURI` |
 | **Platform** | Platform signer, one-time | `setupEvent` during deploy. Locked after setup. |
-| **MintSigner** | Platform signer, EIP-712 | Signs off-chain claim messages for `claim(…)` |
+| **Relayer** | A separate broadcasting wallet (backend `RELAYER_KEY`), re-pointed per clone at setup via `setRelayer`; owner-changeable. Added in v3.1. | Broadcasts `claimTicketFor(…)` and **pays the mint gas** |
+| **MintSigner** | Platform signer's sibling key, **EIP-191 `personal_sign`** (not EIP-712); zero balance | Signs the claim authorization validated by **`claimTicketFor(…)`** |
 
-The Owner ↔ Operator check is implemented as `modifier onlyOwnerOrOperator` on the relevant functions in `EventContract721.sol` and `EventContract1155.sol`.
+The Owner ↔ Operator check is implemented as `modifier onlyOwnerOrOperator` on the relevant functions in `EventContract721V3.sol` and `EventContract1155V3.sol` — the V3 pair is what the registry clones today.
 
 ## Supported actions
 
-| fn | Contract | Paid? | Args |
+| fn | Contract | Paid? (dormant — see the banner: nothing is charged while `FEES_ENABLED=false`) | Args |
 |---|---|---|---|
 | `increaseSupply` | ERC-721 | yes (gas + €5) | `{ additional: uint256 }` |
 | `increaseTypeSupply` | ERC-1155 | yes | `{ typeId: uint256, additional: uint256 }` |
