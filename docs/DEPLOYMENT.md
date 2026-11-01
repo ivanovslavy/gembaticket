@@ -19,6 +19,16 @@ gembaticket-chain-worker     node backend/src/workers/chainActivationWorker.js
 
 All run as an unprivileged user, all restart on failure.
 
+One scheduled oneshot unit sits alongside them:
+
+```
+gembaticket-retention.timer  node backend/scripts/retention.js --apply    05:20 UTC daily
+```
+
+🔴 Its unit declares `After=postgresql.service` and **must never** declare
+`Requires=postgresql.service` — see [`RETENTION.md`](./RETENTION.md) for why that took the whole
+shared cluster down once.
+
 ## Common operations
 
 ```bash
@@ -145,6 +155,22 @@ sudo systemctl restart gembaticket-api gembaticket-chain-worker gembaticket-list
 - Manual backups before a change go to `/gembaticket.com/backup/` and are encrypted the same way.
 - **Redis** — append-only persistence enabled; OTP codes are transient (10-min TTL) so no recovery needed.
 - **On-chain** — ticket ownership and event state survive any DB loss; `eventListener` re-hydrates `BlockSync`-tracked state from the chain.
+
+## Data retention
+
+Section 8 of the Privacy Policy states retention periods, and `gembaticket-retention.timer` is what
+makes them true — **05:20 UTC daily**, `backend/scripts/retention.js`. The script's default is a
+**dry run** that prints what it would do and writes nothing; only the systemd unit passes `--apply`.
+Every run writes a `RetentionRun` + `RetentionItem` audit record (counts only, never personal data).
+
+```bash
+cd /gembaticket.com/backend && node scripts/retention.js     # inspect: writes nothing
+sudo systemctl start gembaticket-retention.service           # the real sweep
+sudo journalctl -u gembaticket-retention -n 30
+```
+
+Full rule table, the guards, the two clock brakes and what is deliberately *not* automated:
+[`RETENTION.md`](./RETENTION.md).
 
 ## Rollback
 

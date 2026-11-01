@@ -85,3 +85,10 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md#prisma-schema-highlights). Core tables
 ## Where it runs
 
 Raspberry Pi 5 (ARM64), Ubuntu Server, behind Apache + Cloudflare. [`DEPLOYMENT.md`](./DEPLOYMENT.md) has the full runbook.
+
+## Scheduled jobs
+
+`scripts/retention.js` — the data-retention sweep behind section 8 of the Privacy Policy. Run by
+`gembaticket-retention.timer` at 05:20 UTC with `--apply`; **run by hand it is a dry run** and writes
+nothing, which is how you inspect a period change before it deletes anything. Audit trail in
+`RetentionRun` / `RetentionItem`. See [`RETENTION.md`](./RETENTION.md).

@@ -205,3 +205,12 @@ All read/write calls to GembaBlockchain flow through `backend/src/utils/fallback
 - **Backups**: nightly, age-encrypted (database, service state, all IPFS pins), private key off the server, off-site copy checksum-verified, restore tested in isolation.
 
 See [`blockchain/docs/audit_solidity.md`](../blockchain/docs/audit_solidity.md) for the formal audit (Slither 0/0/0, Mythril 0/0/0, 81 contract test cases / 129 `expect()` assertions (`npx hardhat test` → 81 passing, 0 failing)).
+
+## Data retention
+
+Personal data is removed on a schedule, not on request only: `gembaticket-retention.timer` runs
+`backend/scripts/retention.js` at 05:20 UTC daily, anonymising rows that still have accounting value
+(a ticket keeps its amount and loses its buyer) and deleting rows that have none (scan logs, webhook
+logs, finished chain jobs). The clock is measured from the **event's end**, not the row's age, so a
+ticket to an event that has not happened is never touched. Periods, guards and audit trail:
+[`RETENTION.md`](./RETENTION.md).
