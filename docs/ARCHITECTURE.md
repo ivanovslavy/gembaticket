@@ -214,3 +214,50 @@ Personal data is removed on a schedule, not on request only: `gembaticket-retent
 logs, finished chain jobs). The clock is measured from the **event's end**, not the row's age, so a
 ticket to an event that has not happened is never touched. Periods, guards and audit trail:
 [`RETENTION.md`](./RETENTION.md).
+
+---
+
+## Poster metadata — the re-clean of 2026-11-01, and why no chain write happened
+
+The four events whose posters carried metadata were re-pinned clean on 2026-10-31 and the
+application was repointed at the clean copies on 2026-11-01. **No transaction was sent.** Two
+measurements, both taken before anything was changed, say why one would have been impossible and
+pointless:
+
+**`setupComplete` is `true` on all four contracts.** `setBaseURI` is `onlyPlatformSetup`, which
+requires `msg.sender == platform` **and** `setupComplete == false`; `completeSetup()` is documented
+as "Lock setup permanently. Platform loses setup access." Simulated as the platform address, the
+call reverts on each of the four. That is the contract working as designed, not a fault.
+
+**Nothing was ever minted, and the chain holds no URI anyway.** `totalMinted()` returns 0 on all
+four. `_baseTokenURI` is the empty string — slot 6 of `EventContract721`'s storage reads zero on
+Dogs Play, where slot 5 holds the event name as an inline short string; there is no public getter,
+no `BaseURIUpdated` event was ever emitted, and the explorer's log for each contract contains no
+IPFS string. So no NFT ever referenced the old metadata, and unpinning it could not break one.
+
+What actually points at the metadata is the **database**: `claimController.js:201-205` sets a
+per-token URI from `Event.ipfsHash` at claim time, as the operator — which still works after
+`setupComplete`, because `setTokenURI` is `onlyOwnerOrOperator`. Repointing `Event.baseURI` and
+`Event.ipfsHash` therefore repoints every future claim, which is the whole of the exposure.
+
+| event | contract | old metadata CID | new metadata CID |
+|---|---|---|---|
+| QR Party (ENDED) | `0xeCAa810CdBDAaf86A286d697f20e9BF8faDB0209` | `QmYzmxKRV61ZYar94ifJGmdCGtkm6oBtgwr7E47sGA1ahm` | `QmY6jCcGrmcna2hKYqgSVMstpiVDqHdSmN4oE4VzXVQj2K` |
+| AI Content (ENDED) | `0xcAF8Cb4e30B570c648D49B737B0Fb31744F68FA3` | `QmPURH4AWiEWzFEFx2N55FiEZwyLAgdBRNWkpmSBac3HyZ` | `QmUZrBYo4dHGGSKLjCdXrcSAor57N5REJGtxSsioe6VYNs` |
+| Ne6to Si (ACTIVE) | `0xa3C9cA0Ba3942e0FD68a9a80F1A429A81D478817` | `QmPjkVvbwXdG5QSQkb4sfYm2fr4LnS9BQCUeXDbQxSywEJ` | `Qma4gv8ML7VSzEY6jeLQNDwPmNnqK3xJBmkfT4pRvadYkW` |
+| Dogs Play (ACTIVE) | `0x2493A1AC0c694281B4AedF88311b66aCeA8572b0` | `QmcurJ7UnoE9bhGo9KE4kUWF4DRP8K8QKoFcKQPc6GULCK` | `QmaqWthg1ddFMHM5BKbJKrV2qXuCHpvECrxw4wA6iJMHni` |
+
+The poster and ticket-page CIDs moved with them — twelve old CIDs in total (metadata, page, poster
+for each event), all unpinned and garbage-collected from our node. The gateway is `Gateway.NoFetch`,
+so an unpinned CID is simply no longer served: all twelve return **404** through
+`ipfs.gembaticket.com`, and all twelve replacements return **200**.
+
+What the cleaning removed, from `file(1)` rather than from a claim: Dogs Play's poster went from
+`JPEG image data, Exif standard` to `JPEG image data, baseline` and lost 65 536 bytes; the three
+PNG posters each lost a `tEXt` chunk (95 bytes). The storefront's own posters
+(`api.gembaticket.com/posters/*.webp`) were checked and carry no metadata at all — they are
+re-encoded WebP, so that surface was never exposed.
+
+🔑 The old CIDs remain valid IPFS addresses. Anyone who pinned them elsewhere still has the
+metadata-bearing bytes; what changed is that **we** no longer serve them. That is the whole of what
+unpinning can achieve, and it is worth stating plainly rather than implying the bytes were recalled.
