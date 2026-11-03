@@ -49,7 +49,7 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 |---|---|---|---|
 | POST | `/buy` | JWT optional | `{ eventId, ticketTypeId, quantity, buyerEmail?, otpToken?, discountCode? }`. `otpToken` required iff no JWT. **`quantity` is clamped server-side to `1…10`** — a larger value is silently reduced to 10 rather than rejected, so echo `ticketIds.length` back to the user instead of assuming the requested quantity. A discount code is checked inside the purchase transaction; a code can never bring the unit price below **0.50 in the ticket type's own currency**. Returns `{ ticketIds, paymentUrl, total, currency, discount }`. |
 | POST | `/discount/check` | public (20/min per IP) | `{ eventId, ticketTypeId, quantity, code }` → price preview `{ valid, unitPrice, unitDiscount, total, totalBefore }` or `400 { valid: false, error }`. |
-| GET  | `/:id` · `/by-token/:token` | public | Ticket view (rotating QR). |
+| GET  | `/:id` · `/by-token/:token` | public | Ticket view (rotating QR). `event` carries `status`, `endsAt`, `ended`, `canceled`. **After the end** (2026-11-03) by-token hands out no seed and no image: `offline = { closed: true, reason, endsAt }`, and binds no phone; before it, `offline.endsAt` travels with the seed so an offline phone stops by itself. `POST /by-token/:token/use-here` after the end → `409 event-ended`. |
 | GET  | `/my` | JWT | Current user's tickets. |
 | GET  | `/event/:eventId` | JWT + organizer role | Organizer view — tickets for their event. |
 
@@ -77,7 +77,7 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 |---|---|---|
 | GET / POST | `/api/dashboard/events/:eventId/zones` | List / create `{ name, color?, level }`. |
 | PUT / DELETE | `/api/dashboard/zones/:id` | Update / remove. |
-| GET / POST | `/api/dashboard/scanners` | Organizer's scanners / create `{ eventId?, label, zones?, activeUntil? }` — plain key returned **once**. |
+| GET / POST | `/api/dashboard/scanners` | Organizer's scanners / create `{ eventId?, label, zones?, activeUntil?, isHub? }` — plain key returned **once**. `isHub: true` = a **venue hub** (18б, see `HUB.md`): needs `eventId`, zones ignored. The list carries `isHub` and `hubUrl`. |
 
 > **Roles (т.22б, 2026-10-31).** `Organizer.role` is `buyer | organizer | admin` and defaults to
 > **buyer**. Every `/api/dashboard/*` route and every authenticated write on an event requires the
@@ -103,12 +103,14 @@ Times: every date/time an organizer sends (event date, ticket-type sale and entr
 | POST | `/refresh` | public | `{ refreshToken }` → a new 2-hour JWT for that device session (until 2026-10-22 the gate signed itself out after 2 hours). |
 | POST | `/logout` | scanner | Ends this device's session. Revoking the scanner ends all of its sessions. |
 | GET  | `/me` | scanner | Current scanner + event + zones. |
-| POST | `/scan` | scanner | `{ payload }` — read-only check of the rotating QR. `403 { valid: false, reason }` for a wrong event/zone, outside the entry window, a canceled or ended event, or a canceled / refunded / unpaid ticket. |
+| POST | `/scan` | scanner | `{ payload }` — read-only check of the rotating QR. `403 { valid: false, reason }` for a wrong event/zone, outside the entry window, a canceled or ended event, or a canceled / refunded / unpaid ticket. "Ended" is the end rule itself (`utils/eventEnd.js`): refused from the end second on, even before the lifecycle tick flips the status. |
 | POST | `/activate` | scanner | Admit + burn (same checks). `409` on a second activation. `423 { heldBy }` when another gate holds the ticket's offline right and cannot be reached (a reachable one is asked and the call waits ≤ 6 s). The on-chain `activateTicket` follows asynchronously (chain worker) for claimed NFTs. |
 | POST | `/activate-manual` | scanner | Admit by ticket id when the QR cannot be read (same `423` rule). |
-| GET  | `/snapshot` | scanner | Offline mode: active events + valid tickets, ETag'd. Send `X-Offline-Protocol: 2`: a ticket's QR seed comes only to the scanner holding its **offline entry right** (`own`), others carry `holder` (the gate that holds it); `leaseSeq` = the scanner's release counter. Without the header: no seeds. |
+| GET  | `/snapshot` | scanner | Offline mode: active events + valid tickets, ETag'd. Send `X-Offline-Protocol: 2`: a ticket's QR seed comes only to the scanner holding its **offline entry right** (`own`), others carry `holder` (the gate that holds it); `leaseSeq` = the scanner's release counter. Without the header: no seeds. Only events whose entry is still open (ACTIVE and not past the end — for every kind of scanner, event-bound ones included); each carries `endsAt` — offline engines refuse once `now + clockSlackS ≥ endsAt`. `hub: { url, label } \| null` = the event's venue hub. |
 | POST | `/offline/heartbeat` | scanner | `{ released: [ticketId], since }` → `{ seq, release: [ticketId], stale, used: [{ id, activatedAt }], serverTime }` — every 3 s while online: acknowledge dropped rights, get the ones to drop, `stale` = refetch the snapshot, `used` = tickets this scanner holds that were used since `since` (send back `serverTime` next time) — mark them used locally. |
-| POST | `/sync` | scanner | Replay offline door decisions (idempotent per `clientId`; `conflict` = another scanner admitted it first). |
+| POST | `/sync` | scanner | Replay offline door decisions (idempotent per `clientId`; `conflict` = another scanner admitted it first, or `reason: "event_ended"` = decided after the event's end — refused, logged `conflict_after_end`; a decision from before the end synced later is applied). A venue hub adds `door` (the door scanner's id): the scan log names that door, `via hub "<label>"`. |
+| GET  | `/hub/doors` | hub | Venue hub only: the event's door scanners (bcrypt key hash, zones, revoked/expiry, bound device) and live sessions (sha256 of the refresh token) — so doors can sign in at the hub with no internet. ETag'd. |
+| POST | `/hub/register` | hub | `{ url }` — where the hub is reachable on the venue LAN (`https://*.gembaticket.com` only); advertised to the event's doors in their snapshot. |
 
 ## Platform admin (`/api/admin`)
 

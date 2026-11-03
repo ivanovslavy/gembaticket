@@ -71,6 +71,8 @@ A full walk-through lives in [`docs/DASHBOARD.md`](./docs/DASHBOARD.md) and [`do
 - **Relay operator** — a role-separated contract model (Owner / Operator / Platform / Relayer / MintSigner) lets the platform act on the organizer's behalf. Every contract is owned by the platform's offline cold key with each role on its own key (checked after every deploy); an organizer who wants the contract itself can ask for ownership in the dashboard and the platform transfers it to their linked wallet.
 - **Scanners + zones** — provision hardware-agnostic scanners with reversible AES-encrypted keys, scoped to specific zone levels.
 - **Offline gates that never let a ticket in twice** — the scanners keep working without network, and each ticket can be admitted offline at only ONE gate (its offline entry right); a right moves to another gate only after its scanner hands it back.
+- **Venue hub (optional)** — one small box on the venue network decides for every door, so with no internet every door admits every ticket exactly once; tested in a virtual venue, not yet on venue hardware (`docs/HUB.md`).
+- **The QR expires with the event** — after the end no door admits it (offline doors stop 40 s early by their own clock), the scanners' offline data drops the event, and the ticket page deletes its code.
 - **Discount codes** — percent or fixed amount, per ticket type, with a use limit and expiry; checked on the server inside the purchase.
 - **Cancel or let it end** — cancel with automatic or manual refunds (buyers e-mailed, tickets void at the gate); events end on their own when the last entry window closes.
 - **CSV export** — every ticket with price paid, discount, NFT claim, scan and refund status.
@@ -142,6 +144,7 @@ gembaticket.com/
 │   ├── I18N.md               the EN/BG/ES translation pass
 │   ├── OTP_FLOW.md           email OTP (login + purchase)
 │   ├── SCANNER.md            gate-staff PWA overview
+│   ├── HUB.md                venue hub — every door, every ticket, no internet (18б)
 │   ├── STATIC-ANALYSIS-2026-10-30.md   Slither/Aderyn run on the live generation
 │   ├── fees-and-limits-gemba.md        fee + limit reference (fees dormant)
 │   └── migration-gembablockchain.md    the move off Sepolia (2026-06-08)

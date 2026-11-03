@@ -321,3 +321,46 @@ because that needs the current holder's acknowledgement.
 
 The ticket page now shows the door that holds its offline entry right ("Entry: North Gate"), and the
 name follows the right when it moves — so people queue where they can actually be admitted.
+
+
+---
+
+# 2026-11-03 — the entry QR expires with the event
+
+Until today a QR kept working after its event: the phone rendered it forever, an event-bound scanner
+still received an ended or canceled event (seeds included) in its snapshot, the offline engines had no
+notion of an end, and an online door waited for the 60 s lifecycle tick to flip the status.
+
+**One end rule for everything** — `backend/src/utils/eventEnd.js → computeEndsAt` (the organizer's
+`endDate`, else the latest entry-window end, else `eventDate + EVENT_END_GRACE_HOURS`):
+
+| where | what happens after the end |
+|---|---|
+| online `/scan`, `/activate`, `/activate-manual` | refused (`event_ended`) from the end second on, whatever the status says |
+| `/snapshot` | ENDED / CANCELED / past-the-end events are left out for **every** scanner kind; open events carry `endsAt` |
+| PWA (`offline.js → entryClosedOffline`) and Pi reader (`reader.py → entry_closed_offline`) offline | refused once `now + clockSlackS ≥ endsAt` |
+| `/sync` | an admit decided after the end → `conflict` / `event_ended`, ScanLog `conflict_after_end`; one decided before the end and synced later is applied |
+| ticket page (`by-token`, `SwipeableTicketCard`) | no seed, no image; the card shows *This event has ended* (EN/BG/ES) and deletes the cached seed — offline too, because `endsAt` is cached with the seed |
+
+**Tolerance, chosen deliberately:** an offline device cannot ask anybody what time it is, so it closes
+`clockSlackS` (40 s, `shared/qr-window.json`) **before** the end by its own clock. A device whose clock
+runs slow by up to the slack therefore still never admits after the real end; online doors use the
+server clock and no slack. A device more than 40 s slow could still stamp a late admit with a time
+before the end — that is the same trust the QR window already places in the device clock.
+
+Also fixed on the way: the ticket page's 30 s refresh replaced the whole ticket with "not found" the
+moment the phone lost its network; a failed **refresh** now keeps the ticket (and its locally drawn QR)
+on screen.
+
+E2E: `tests/e2e/qr-event-end-e2e.js` — 44 checks: online before the tick, snapshot for every scanner
+kind, the real PWA in a browser offline (admit before, refuse inside the slack margin, refuse after,
+IndexedDB emptied at the next snapshot), the Pi engine, sync before/after, two phone pages (online and
+offline at the end).
+
+# 2026-11-03 — venue hub (18б)
+
+Every door admits every ticket exactly once without internet when the venue runs a local hub. Entry
+calls (`scan`, `activate`, `activate-manual`) go to the hub first (`config/api.js`: the API base is a
+run-time setting, the hub address comes from the snapshot's `hub` or `?hub=`), then the cloud, then the
+local offline engine. See [`HUB.md`](./HUB.md).
+
